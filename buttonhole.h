@@ -18,6 +18,7 @@ class ButtonHole : public QWidget
 
         void setPositon(int newX, int newY);
         void setBtnText(QString newText);
+        void setAudioDevice(const QAudioDevice &device);
 
     protected:
         void keyPressEvent(QKeyEvent *event) override;

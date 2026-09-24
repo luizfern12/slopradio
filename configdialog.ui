@@ -213,6 +213,31 @@
       <attribute name="title">
        <string>Saídas</string>
       </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_outputs">
+       <item>
+        <widget class="QLabel" name="label_9">
+         <property name="text">
+          <string>Dispositivo de saída</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="output_device"/>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_outputs">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
      </widget>
      <widget class="QWidget" name="tabBehavior">
       <attribute name="title">

@@ -5,6 +5,7 @@
 #include <QMediaPlayer>
 #include <QAudioOutput>
 #include <QAudioBufferOutput>
+#include <QAudioDevice>
 
 class AudioPlayer: public QObject
 {
@@ -33,12 +34,14 @@ class AudioPlayer: public QObject
         bool isStopped();
         qreal getVolume();
         void setVolume(float volume);
+        void setAudioDevice(const QAudioDevice &device);
         void fadeOut();
         void fadeIn();
         void fade();
         void setBuffer(QAudioBufferOutput *output);
         bool hasError() const { return m_hasError; }
         static bool isValidMediaFile(const QString &path);
+        static QAudioDevice configuredAudioDevice();
 
     signals:
         void update_position(qint64 position);

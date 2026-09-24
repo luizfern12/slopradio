@@ -41,6 +41,27 @@ Fork: https://github.com/brdelphus/lararadio
   the currently-playing track keeps pointing at that same track (was
   index-clamped only, which could skip tracks after a deletion).
 
+#### `configdialog.ui` / `configdialog.cpp`
+- **Sound output settings (Saídas tab)**: the placeholder tab now
+  lets you pick the audio output device — "System default" or any
+  device reported by `QMediaDevices::audioOutputs()`. The list
+  refreshes live while the dialog is open (device hot-plug/unplug)
+  and the choice is saved to `audio/outputDevice` (by device id).
+
+#### `audioplayer.h` / `audioplayer.cpp` / `buttonhole.h` / `buttonhole.cpp`
+- **`AudioPlayer::configuredAudioDevice()`**: resolves the saved
+  device id against the currently connected devices, falling back to
+  the system default when nothing is saved or the saved device is
+  gone. Every player applies it on construction — both crossfade
+  players and the botoeira (`ButtonHole`) buttons.
+
+#### `mainwindow.h` / `mainwindow.cpp`
+- **`applyAudioOutputDevice()`**: pushes the configured device to all
+  live outputs (crossfade players, hour-announcement player, botoeira
+  buttons) at startup and again after the settings dialog closes —
+  only when the device actually changed, so opening the dialog
+  mid-song doesn't interrupt playback.
+
 ### Changed
 
 #### `mainwindow.ui` / `mainwindow.h` / `mainwindow.cpp`

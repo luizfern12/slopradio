@@ -12,6 +12,7 @@ ButtonHole::ButtonHole(QWidget *parent) : QWidget(parent)
 
     player->setAudioOutput(audioOutput);
     audioOutput->setVolume(1.0f);
+    audioOutput->setDevice(AudioPlayer::configuredAudioDevice());
 
     settings = new QSettings("LaraRadio", "LaraRadio", this);
 
@@ -36,6 +37,11 @@ void ButtonHole::setBtnText(QString newText)
 {
     text = newText;
     button->setText( text );
+}
+
+void ButtonHole::setAudioDevice(const QAudioDevice &device)
+{
+    audioOutput->setDevice(device);
 }
 
 void ButtonHole::bntContextMenu(QPoint pos)

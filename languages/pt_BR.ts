@@ -187,6 +187,14 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Dispositivo de saída</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Padrão do sistema</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../build/Desktop_Qt_6_9_1-Debug/LaraRadio/configdialog.ui" line="209"/>
         <location filename="../build/Desktop_Qt_6_9_1-Release/LaraRadio/configdialog.ui" line="209"/>
         <location filename="../configdialog.ui" line="209"/>

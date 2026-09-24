@@ -133,8 +133,11 @@ void MainWindow::init()
     timeplayer = new QMediaPlayer(this);
     timeAudioOutput = new QAudioOutput(this);
 
+    QAudioDevice outputDevice = AudioPlayer::configuredAudioDevice();
     timeplayer->setAudioOutput(timeAudioOutput);
     timeAudioOutput->setVolume(1.0f);
+    timeAudioOutput->setDevice(outputDevice);
+    m_appliedOutputDevice = outputDevice;
 
     model = new QFileSystemModel(this);
     model->setRootPath( QDir::homePath() );
@@ -1161,6 +1164,28 @@ void MainWindow::showConfigDialog()
     configDialog.move(x, y);
 
     configDialog.exec();
+
+    // the output device (or the device list) may have changed in the dialog
+    applyAudioOutputDevice();
+}
+
+void MainWindow::applyAudioOutputDevice()
+{
+    QAudioDevice device = AudioPlayer::configuredAudioDevice();
+
+    // skip when nothing changed, so closing the dialog doesn't disturb playback
+    if (device == m_appliedOutputDevice)
+        return;
+
+    audioplayer1.setAudioDevice(device);
+    audioplayer2.setAudioDevice(device);
+    if (timeAudioOutput)
+        timeAudioOutput->setDevice(device);
+
+    for (ButtonHole *hole : buttonHole)
+        hole->setAudioDevice(device);
+
+    m_appliedOutputDevice = device;
 }
 
 void MainWindow::savePlaylist()

@@ -6,6 +6,7 @@
 #include <QCoreApplication>
 #include <QFileDialog>
 #include <QDialogButtonBox>
+#include <QByteArray>
 
 namespace Ui {
 class ConfigDialog;
@@ -29,6 +30,8 @@ private slots:
     void on_btn_searchTimePath_clicked();
 
 private:
+    void populateOutputDevices(const QByteArray &selectId);
+
     Ui::ConfigDialog *ui;
 
     QSettings settings;

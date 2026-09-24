@@ -43,6 +43,28 @@ Fork: https://github.com/brdelphus/lararadio
   continua apontando para a mesma faixa (antes só ajustava o limite,
   o que podia pular faixas após uma remoção).
 
+#### `configdialog.ui` / `configdialog.cpp`
+- **Configurações de saída de som (aba Saídas)**: a aba de espaço
+  vazio agora permite escolher o dispositivo de saída de áudio —
+  "Padrão do sistema" ou qualquer dispositivo de
+  `QMediaDevices::audioOutputs()`. A lista se atualiza em tempo real
+  com o dialogo aberto (plug/remove de dispositivos) e a escolha é
+  salva em `audio/outputDevice` (por id do dispositivo).
+
+#### `audioplayer.h` / `audioplayer.cpp` / `buttonhole.h` / `buttonhole.cpp`
+- **`AudioPlayer::configuredAudioDevice()`**: resolve o id salvo do
+  dispositivo contra os dispositivos conectados, voltando ao padrão do
+  sistema quando nada está salvo ou o dispositivo sumiu. Todos os
+  players aplicam na construção — os dois players de crossfade e os
+  botões da botoeira (`ButtonHole`).
+
+#### `mainwindow.h` / `mainwindow.cpp`
+- **`applyAudioOutputDevice()`**: aplica o dispositivo configurado em
+  todas as saídas ativas (players de crossfade, player da locução de
+  hora, botoeira) na inicialização e de novo após fechar o dialogo de
+  configurações — apenas quando o dispositivo mudou de verdade, para
+  não interromper a reprodução ao abrir o dialogo.
+
 ### Alterado
 
 #### `mainwindow.ui` / `mainwindow.h` / `mainwindow.cpp`

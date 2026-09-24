@@ -118,12 +118,14 @@ private:
     QList<QWidget*> collectResizableWidgets();
     void snapshotDesignGeometry();
     void scaleWidgets();
+    void applyAudioOutputDevice();
 
     Ui::MainWindow *ui;
     AudioPlayer audioplayer1;
     AudioPlayer audioplayer2;
     QMediaPlayer *timeplayer;
-    QAudioOutput *timeAudioOutput;
+    QAudioOutput *timeAudioOutput = nullptr;
+    QAudioDevice m_appliedOutputDevice;
     std::vector<Playlist> playlist;
 
     QFileSystemModel *model;

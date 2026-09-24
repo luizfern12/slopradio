@@ -223,6 +223,14 @@
         <translation>Behavior</translation>
     </message>
     <message>
+        <source>Dispositivo de saída</source>
+        <translation>Output device</translation>
+    </message>
+    <message>
+        <source>Padrão do sistema</source>
+        <translation>System default</translation>
+    </message>
+    <message>
         <location filename="../build/Desktop_Qt_6_9_1-Debug/LaraRadio/configdialog.ui" line="209"/>
         <location filename="../build/Desktop_Qt_6_9_1-Release/LaraRadio/configdialog.ui" line="209"/>
         <location filename="../configdialog.ui" line="209"/>

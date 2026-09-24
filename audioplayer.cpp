@@ -8,12 +8,15 @@
 #include <QProcess>
 #include <QFileInfo>
 #include <QDir>
+#include <QSettings>
+#include <QMediaDevices>
 
 AudioPlayer::AudioPlayer()
 {
     current_length = 0;
     player = new QMediaPlayer;
     audioOutput = new QAudioOutput;
+    audioOutput->setDevice(configuredAudioDevice());
 
     player->setAudioOutput(audioOutput);
     audioOutput->setVolume(1.0);
@@ -121,6 +124,11 @@ bool AudioPlayer::isStopped() { return player->playbackState() == QMediaPlayer::
 qreal AudioPlayer::getVolume() { return audioOutput->volume(); }
 void AudioPlayer::setVolume(float volume) { audioOutput->setVolume(volume); }
 
+void AudioPlayer::setAudioDevice(const QAudioDevice &device)
+{
+    audioOutput->setDevice(device);
+}
+
 void AudioPlayer::fadeOut() { if(isPlaying()) _fadeOut = true; }
 void AudioPlayer::fadeIn() { if(isStopped()) _fadeIn = true; }
 
@@ -166,4 +174,22 @@ bool AudioPlayer::isValidMediaFile(const QString &path)
     bool ok = false;
     out.toDouble(&ok);
     return ok;
+}
+
+QAudioDevice AudioPlayer::configuredAudioDevice()
+{
+    QSettings settings("LaraRadio", "LaraRadio");
+    const QByteArray wantedId = settings.value("audio/outputDevice").toByteArray();
+
+    // saved device still plugged in?
+    if (!wantedId.isEmpty()) {
+        const QList<QAudioDevice> devices = QMediaDevices::audioOutputs();
+        for (const QAudioDevice &device : devices) {
+            if (device.id() == wantedId)
+                return device;
+        }
+    }
+
+    // nothing saved (or the saved device is gone): system default
+    return QMediaDevices::defaultAudioOutput();
 }
