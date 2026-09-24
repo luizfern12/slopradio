@@ -25,6 +25,8 @@
 #include <QShowEvent>
 #include <QDragEnterEvent>
 #include <QDropEvent>
+#include <QResizeEvent>
+#include <QHash>
 #include <QTranslator>
 #include <QPainter>
 #include <QPaintEvent>
@@ -62,6 +64,7 @@ protected:
     void showEvent(QShowEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 public slots:
     void directoryViewer();
@@ -112,6 +115,9 @@ private:
     QAudioFormat getAudioFormat();
     void calculateRMS(const QAudioBuffer &buffer);
     void addFileToPlaylist(const QString &filepath, const QString &type = "music");
+    QList<QWidget*> collectResizableWidgets();
+    void snapshotDesignGeometry();
+    void scaleWidgets();
 
     Ui::MainWindow *ui;
     AudioPlayer audioplayer1;
@@ -166,5 +172,7 @@ private:
     bool m_recentPlaylistLoaded = false;
     QTimer *m_displayTimer = nullptr;
     int m_silenceMs = 0;
+    QSize m_designSize;
+    QHash<QWidget*, QRect> m_designGeometry;
 };
 #endif // MAINWINDOW_H

@@ -23,9 +23,23 @@ Fork: https://github.com/brdelphus/lararadio
   estava duplicada nos handlers de duplo clique foi extraída para um
   único helper, agora compartilhado pelo arrastar e soltar e pelos dois
   navegadores de arquivos.
-- **`dragEnterEvent()` / `dropEvent()`**: o alvo do soltar é limitado
-  ao widget da playlist — só solturas sobre `audio_list` (ou seu
-  viewport) são aceitas, e apenas quando carregam URLs de arquivos.
+- **`dragEnterEvent()` / `dropEvent()`**: solturas com URLs de arquivos
+  são aceitas em qualquer lugar da janela e adicionadas à playlist. O
+  alvo do soltar não depende de `widgetAt()`/mapeamento de posição
+  (imprevisível durante drags reais e após redimensionar a janela), então
+  o arrastar e soltar funciona em qualquer tamanho de janela — inclusive
+  depois de redimensionar.
+
+### Alterado
+
+#### `mainwindow.ui` / `mainwindow.h` / `mainwindow.cpp`
+- **Janela redimensionável**: a janela era de tamanho fixo
+  (`setFixedSize` + `sizePolicy Fixed`). Agora pode ser redimensionada
+  livremente (mínimo 800×480). Como a UI usa posicionamento absoluto,
+  o `resizeEvent()` agora escala todos os widgets proporcionalmente ao
+  tamanho de design (1048×622) — o layout mantém as proporções exatas
+  em qualquer tamanho de janela, incluindo os VU meters e os botões da
+  botoeira criados em código.
 
 ---
 

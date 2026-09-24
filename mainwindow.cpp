@@ -34,7 +34,11 @@
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    this->setFixedSize(this->size().width(), this->size().height());
+
+    // tamanho de design do mainwindow.ui — base para o redimensionamento proporcional
+    m_designSize = this->size();
+
+    this->setMinimumSize(800, 480);
     this->setFocusPolicy(Qt::StrongFocus);
     this->setFocus();
     this->setAcceptDrops(true);
@@ -55,6 +59,12 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent), ui(new Ui::MainWin
 
     initConfig();
     init();
+
+    // captura a geometria de design (tamanho padrão da mainwindow.ui)
+    snapshotDesignGeometry();
+
+    // identidade no tamanho padrão
+    scaleWidgets();
 }
 
 MainWindow::~MainWindow()
@@ -273,10 +283,10 @@ void MainWindow::keyPressEvent(QKeyEvent *event){
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event)
 {
-    QWidget *target = QApplication::widgetAt(this->mapToGlobal(event->position().toPoint()));
-
-    if (event->mimeData()->hasUrls()
-        && (target == ui->audio_list || target == ui->audio_list->viewport()))
+    // aceita qualquer arraste de arquivos: o widgetAt()/mapeamento de posição é
+    // imprevisível durante drags reais (e muda com o tamanho da janela), então
+    // o alvo é a janela inteira, não o retângulo exato da playlist
+    if (event->mimeData()->hasUrls())
         event->acceptProposedAction();
 }
 
@@ -287,6 +297,61 @@ void MainWindow::dropEvent(QDropEvent *event)
             addFileToPlaylist(url.toLocalFile());
     }
     event->acceptProposedAction();
+}
+
+QList<QWidget*> MainWindow::collectResizableWidgets()
+{
+    QList<QWidget*> widgets;
+
+    // widgets posicionados absolutamente no centralwidget
+    for (QObject *o : centralWidget()->children())
+        if (QWidget *w = qobject_cast<QWidget *>(o))
+            widgets << w;
+
+    // filhos dos group boxes (posicionados absolutamente dentro deles)
+    for (QObject *o : ui->groupBox->children())
+        if (QWidget *w = qobject_cast<QWidget *>(o))
+            widgets << w;
+
+    for (QObject *o : ui->groupBox_2->children())
+        if (QWidget *w = qobject_cast<QWidget *>(o))
+            widgets << w;
+
+    // widgets programáticos (VU meters, botões da botoeira)
+    for (QObject *o : this->children())
+        if (QWidget *w = qobject_cast<QWidget *>(o))
+            if (w != centralWidget() && w != menuBar())
+                widgets << w;
+
+    return widgets;
+}
+
+void MainWindow::snapshotDesignGeometry()
+{
+    m_designGeometry.clear();
+    for (QWidget *w : collectResizableWidgets())
+        m_designGeometry.insert(w, w->geometry());
+}
+
+void MainWindow::scaleWidgets()
+{
+    if (m_designGeometry.isEmpty() || m_designSize.isEmpty())
+        return;
+
+    const qreal sx = width() / qreal(m_designSize.width());
+    const qreal sy = height() / qreal(m_designSize.height());
+
+    for (auto it = m_designGeometry.constBegin(); it != m_designGeometry.constEnd(); ++it) {
+        const QRect &r = it.value();
+        it.key()->setGeometry(QRect(qRound(r.x() * sx), qRound(r.y() * sy),
+                                    qRound(r.width() * sx), qRound(r.height() * sy)));
+    }
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    scaleWidgets();
 }
 
 

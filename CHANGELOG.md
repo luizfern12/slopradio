@@ -22,9 +22,22 @@ Fork: https://github.com/brdelphus/lararadio
 - **`addFileToPlaylist()`**: the TagLib metadata + duration logic that
   was duplicated in the double-click handlers was extracted into a
   single helper, now shared by drag & drop and both file browsers.
-- **`dragEnterEvent()` / `dropEvent()`**: drop target is limited to the
-  playlist widget — only drops landing on `audio_list` (or its
-  viewport) are accepted, and only when they carry file URLs.
+- **`dragEnterEvent()` / `dropEvent()`**: drops carrying file URLs are
+  accepted anywhere on the window and added to the playlist. The drop
+  target deliberately doesn't rely on `widgetAt()`/position mapping
+  (which is unreliable during real drags and after window resizes), so
+  drag & drop keeps working at any window size — including after the
+  window is resized.
+
+### Changed
+
+#### `mainwindow.ui` / `mainwindow.h` / `mainwindow.cpp`
+- **Resizable window**: the window was fixed-size (`setFixedSize` +
+  `sizePolicy Fixed`). It is now freely resizable (minimum 800×480).
+  Since the UI is built with absolute positioning, `resizeEvent()` now
+  scales every widget proportionally to the design size (1048×622) —
+  the layout keeps its exact proportions at any window size, including
+  the programmatic VU meters and button-hole buttons.
 
 ---
 
