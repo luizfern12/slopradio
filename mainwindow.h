@@ -23,6 +23,8 @@
 #include <QCoreApplication>
 #include <QKeyEvent>
 #include <QShowEvent>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QTranslator>
 #include <QPainter>
 #include <QPaintEvent>
@@ -58,6 +60,8 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
     void paintEvent(QPaintEvent *) override;
     void showEvent(QShowEvent *event) override;
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
 
 public slots:
     void directoryViewer();
@@ -107,6 +111,7 @@ private slots:
 private:
     QAudioFormat getAudioFormat();
     void calculateRMS(const QAudioBuffer &buffer);
+    void addFileToPlaylist(const QString &filepath, const QString &type = "music");
 
     Ui::MainWindow *ui;
     AudioPlayer audioplayer1;

@@ -8,6 +8,26 @@ Fork: https://github.com/brdelphus/lararadio
 
 ---
 
+## [Unreleased]
+
+### Added
+
+#### `mainwindow.h` / `mainwindow.cpp`
+- **File drag & drop into the playlist**: audio files can now be dragged
+  onto the playlist (`audio_list`) from the OS file manager — or from
+  the built-in file/jingle browsers (drag is now enabled on both
+  `QTreeView`s). Files are added as `music` items, folders as
+  `folder-music` items, matching the existing "add from file browser"
+  behavior.
+- **`addFileToPlaylist()`**: the TagLib metadata + duration logic that
+  was duplicated in the double-click handlers was extracted into a
+  single helper, now shared by drag & drop and both file browsers.
+- **`dragEnterEvent()` / `dropEvent()`**: drop target is limited to the
+  playlist widget — only drops landing on `audio_list` (or its
+  viewport) are accepted, and only when they carry file URLs.
+
+---
+
 ## [1.0.5] — 2026-07-27 — Changes on top of original 1.0.4
 
 ### Changed

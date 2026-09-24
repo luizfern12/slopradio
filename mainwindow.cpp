@@ -26,6 +26,9 @@
 #include <QRandomGenerator>
 #include <QDesktopServices>
 #include <QFile>
+#include <QUrl>
+#include <QMimeData>
+#include <QFileInfo>
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent), ui(new Ui::MainWindow)
@@ -34,6 +37,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent), ui(new Ui::MainWin
     this->setFixedSize(this->size().width(), this->size().height());
     this->setFocusPolicy(Qt::StrongFocus);
     this->setFocus();
+    this->setAcceptDrops(true);
 
     //this->setWindowFlags(Qt::FramelessWindowHint | Qt::Window);
     //this->setAttribute(Qt::WA_TranslucentBackground);
@@ -267,6 +271,24 @@ void MainWindow::keyPressEvent(QKeyEvent *event){
     }
 }
 
+void MainWindow::dragEnterEvent(QDragEnterEvent *event)
+{
+    QWidget *target = QApplication::widgetAt(this->mapToGlobal(event->position().toPoint()));
+
+    if (event->mimeData()->hasUrls()
+        && (target == ui->audio_list || target == ui->audio_list->viewport()))
+        event->acceptProposedAction();
+}
+
+void MainWindow::dropEvent(QDropEvent *event)
+{
+    for (const QUrl &url : event->mimeData()->urls()) {
+        if (url.isLocalFile())
+            addFileToPlaylist(url.toLocalFile());
+    }
+    event->acceptProposedAction();
+}
+
 
 void MainWindow::changeLanguage(QString lang)
 {
@@ -336,6 +358,45 @@ void MainWindow::unSelectedFiles()
 {
     ui->files->selectionModel()->clearSelection();
     ui->files->selectionModel()->clearCurrentIndex();
+}
+
+void MainWindow::addFileToPlaylist(const QString &filepath, const QString &type)
+{
+    QFileInfo info(filepath);
+
+    if (info.isDir()) {
+        playlist.push_back({
+            info.fileName(),
+            filepath,
+            "--:--",
+            type == "jingle" ? "folder-jingle" : "folder-music"
+        });
+        updateAudioList();
+        return;
+    }
+
+    QString filename = info.fileName();
+    filename = filename.remove(".mp3");
+    filename = filename.remove(".wav");
+    filename = filename.remove(".flac");
+    filename = filename.remove(".ogg");
+
+    QString duration = "";
+    TagLib::FileRef aud(filepath.toStdString().c_str());
+    if (!aud.isNull() && aud.audioProperties()) {
+        int totalSeconds = aud.audioProperties()->length();
+        int minutes = totalSeconds / 60;
+        int seconds = totalSeconds % 60;
+
+        duration = QString("%1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0'));
+
+        if(aud.tag()->artist()!="" && aud.tag()->title()!="") {
+            filename = QString::fromStdString( aud.tag()->title().toCString(true) ) + " - " + QString::fromStdString( aud.tag()->artist().toCString(true) );
+        }
+    }
+
+    playlist.push_back({filename, filepath, duration, type});
+    updateAudioList();
 }
 
 void MainWindow::seek(int mseconds)
@@ -543,64 +604,14 @@ void MainWindow::currentTimePositionClock(QTime time)
 void MainWindow::onFilesItemDoubleClicked(const QModelIndex &index)
 {
     if (index.isValid() && !model->isDir(index)) {
-        QVariant data = index.model()->data(index, Qt::DisplayRole);
-        QString filename = data.toString();
-
-        filename = filename.remove(".mp3");
-        filename = filename.remove(".wav");
-        filename = filename.remove(".flac");
-        filename = filename.remove(".ogg");
-
-        QString filepath = model->filePath(index);
-
-        QString duration = "";
-        TagLib::FileRef aud(filepath.toStdString().c_str());
-        if (!aud.isNull() && aud.audioProperties()) {
-            int totalSeconds = aud.audioProperties()->length();
-            int minutes = totalSeconds / 60;
-            int seconds = totalSeconds % 60;
-
-            duration = QString("%1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0'));
-
-            if(aud.tag()->artist()!="" && aud.tag()->title()!="") {
-                filename = QString::fromStdString( aud.tag()->title().toCString(true) ) + " - " + QString::fromStdString( aud.tag()->artist().toCString(true) );
-            }
-        }
-
-        playlist.push_back({filename, filepath, duration, "music"});
-        updateAudioList();
+        addFileToPlaylist(model->filePath(index), "music");
     }
 }
 
 void MainWindow::onJingleFilesItemDoubleClicked(const QModelIndex &index)
 {
     if (index.isValid() && !model->isDir(index)) {
-        QVariant data = index.model()->data(index, Qt::DisplayRole);
-        QString filename = data.toString();
-
-        filename = filename.remove(".mp3");
-        filename = filename.remove(".wav");
-        filename = filename.remove(".flac");
-        filename = filename.remove(".ogg");
-
-        QString filepath = model->filePath(index);
-
-        QString duration = "";
-        TagLib::FileRef aud(filepath.toStdString().c_str());
-        if (!aud.isNull() && aud.audioProperties()) {
-            int totalSeconds = aud.audioProperties()->length();
-            int minutes = totalSeconds / 60;
-            int seconds = totalSeconds % 60;
-
-            duration = QString("%1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0'));
-
-            if(aud.tag()->artist()!="" && aud.tag()->title()!="") {
-                filename = QString::fromStdString( aud.tag()->title().toCString(true) ) + " - " + QString::fromStdString( aud.tag()->artist().toCString(true) );
-            }
-        }
-
-        playlist.push_back({filename, filepath, duration, "jingle"});
-        updateAudioList();
+        addFileToPlaylist(model->filePath(index), "jingle");
     }
 }
 
@@ -615,11 +626,13 @@ void MainWindow::directoryViewer()
 {
     model->setHeaderData(0, Qt::Vertical, tr("Nome"));
     ui->files->setModel(model);
+    ui->files->setDragEnabled(true);
     ui->files->hideColumn(1);
     ui->files->hideColumn(2);
     ui->files->hideColumn(3);
 
     ui->jingle_files->setModel(model);
+    ui->jingle_files->setDragEnabled(true);
     ui->jingle_files->hideColumn(1);
     ui->jingle_files->hideColumn(2);
     ui->jingle_files->hideColumn(3);

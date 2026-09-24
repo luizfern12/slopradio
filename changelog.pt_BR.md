@@ -8,6 +8,27 @@ Fork: https://github.com/brdelphus/lararadio
 
 ---
 
+## [Não lançado]
+
+### Adicionado
+
+#### `mainwindow.h` / `mainwindow.cpp`
+- **Arrastar e soltar arquivos na playlist**: agora é possível arrastar
+  arquivos de áudio para a playlist (`audio_list`) a partir do
+  gerenciador de arquivos do sistema — ou dos navegadores de
+  arquivos/vinhetas internos (arrastar habilitado nos dois `QTreeView`s).
+  Arquivos viram itens `music`, pastas viram itens `folder-music`,
+  igual ao comportamento de "adicionar pelo navegador de arquivos".
+- **`addFileToPlaylist()`**: a lógica de metadados TagLib + duração que
+  estava duplicada nos handlers de duplo clique foi extraída para um
+  único helper, agora compartilhado pelo arrastar e soltar e pelos dois
+  navegadores de arquivos.
+- **`dragEnterEvent()` / `dropEvent()`**: o alvo do soltar é limitado
+  ao widget da playlist — só solturas sobre `audio_list` (ou seu
+  viewport) são aceitas, e apenas quando carregam URLs de arquivos.
+
+---
+
 ## [1.0.5] — 2026-07-27 — Modificações sobre o original 1.0.4
 
 ### Alterado
