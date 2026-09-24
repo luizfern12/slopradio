@@ -175,6 +175,18 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Fade</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Saídas</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Comportamento</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../build/Desktop_Qt_6_9_1-Debug/LaraRadio/configdialog.ui" line="209"/>
         <location filename="../build/Desktop_Qt_6_9_1-Release/LaraRadio/configdialog.ui" line="209"/>
         <location filename="../configdialog.ui" line="209"/>

@@ -54,6 +54,16 @@ Fork: https://github.com/brdelphus/lararadio
   em qualquer tamanho de janela, incluindo os VU meters e os botões da
   botoeira criados em código.
 
+#### `configdialog.ui`
+- **Dialogo de configurações com abas**: o dialogo agora usa um
+  `QTabWidget` com a barra de abas no **lado esquerdo**
+  (`TabPosition::West`), dividindo a antiga tela única em quatro
+  seções: **Fade** (spinboxes de tempo de fade + opções de fade ao
+  parar/falar), **Caminhos** (os três diretórios), **Saídas** (espaço
+  vazio para futuras configurações de saída) e **Comportamento**
+  (opções do relógio). O dialogo agora usa layouts reais em vez de
+  posicionamento absoluto.
+
 ---
 
 ## [1.0.5] — 2026-07-27 — Modificações sobre o original 1.0.4

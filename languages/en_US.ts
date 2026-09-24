@@ -211,6 +211,18 @@
         <translation>Paths</translation>
     </message>
     <message>
+        <source>Fade</source>
+        <translation>Fade</translation>
+    </message>
+    <message>
+        <source>Saídas</source>
+        <translation>Outputs</translation>
+    </message>
+    <message>
+        <source>Comportamento</source>
+        <translation>Behavior</translation>
+    </message>
+    <message>
         <location filename="../build/Desktop_Qt_6_9_1-Debug/LaraRadio/configdialog.ui" line="209"/>
         <location filename="../build/Desktop_Qt_6_9_1-Release/LaraRadio/configdialog.ui" line="209"/>
         <location filename="../configdialog.ui" line="209"/>

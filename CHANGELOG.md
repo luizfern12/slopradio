@@ -51,6 +51,15 @@ Fork: https://github.com/brdelphus/lararadio
   the layout keeps its exact proportions at any window size, including
   the programmatic VU meters and button-hole buttons.
 
+#### `configdialog.ui`
+- **Tabbed settings dialog**: the settings dialog now uses a
+  `QTabWidget` with the tab bar on the **left side**
+  (`TabPosition::West`), splitting the old single screen into four
+  sections: **Fade** (fade timing spinboxes + stop/talk fade options),
+  **Caminhos** (the three directories), **Saídas** (empty placeholder
+  for future output settings) and **Comportamento** (clock options).
+  The dialog now uses real layouts instead of absolute positioning.
+
 ---
 
 ## [1.0.5] — 2026-07-27 — Changes on top of original 1.0.4

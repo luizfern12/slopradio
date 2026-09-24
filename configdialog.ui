@@ -6,332 +6,293 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>708</width>
-    <height>514</height>
+    <width>660</width>
+    <height>440</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <widget class="QDialogButtonBox" name="buttonBox">
-   <property name="geometry">
-    <rect>
-     <x>470</x>
-     <y>470</y>
-     <width>221</width>
-     <height>32</height>
-    </rect>
-   </property>
-   <property name="orientation">
-    <enum>Qt::Orientation::Horizontal</enum>
-   </property>
-   <property name="standardButtons">
-    <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Save</set>
-   </property>
-   <property name="centerButtons">
-    <bool>false</bool>
-   </property>
-  </widget>
-  <widget class="QGroupBox" name="groupBox">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>20</y>
-     <width>681</width>
-     <height>191</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>Volumes</string>
-   </property>
-   <widget class="QSpinBox" name="fadeInOut">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>60</y>
-      <width>121</width>
-      <height>27</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>30</y>
-      <width>251</width>
-      <height>18</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Sobrepôr Áudios (FadeIn e FadeOut)</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_2">
-    <property name="geometry">
-     <rect>
-      <x>140</x>
-      <y>63</y>
-      <width>71</width>
-      <height>18</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Segundos</string>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="stopFade">
-    <property name="geometry">
-     <rect>
-      <x>370</x>
-      <y>100</y>
-      <width>301</width>
-      <height>24</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Usar FadeOut ao parar</string>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="talkFade">
-    <property name="geometry">
-     <rect>
-      <x>370</x>
-      <y>130</y>
-      <width>311</width>
-      <height>24</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Usar FadeOut e FadeIn ao clicar para falar</string>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="sayClock">
-    <property name="geometry">
-     <rect>
-      <x>370</x>
-      <y>40</y>
-      <width>261</width>
-      <height>24</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Falar as horas ao clicar no relógio</string>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="sayClockFade">
-    <property name="geometry">
-     <rect>
-      <x>370</x>
-      <y>70</y>
-      <width>291</width>
-      <height>24</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Usar FadeIn e FadeOut ao falar as horas</string>
-    </property>
-   </widget>
-   <widget class="QSpinBox" name="speedFade">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>140</y>
-      <width>121</width>
-      <height>27</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_3">
-    <property name="geometry">
-     <rect>
-      <x>140</x>
-      <y>143</y>
-      <width>71</width>
-      <height>18</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Segundos</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_4">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>110</y>
-      <width>271</width>
-      <height>18</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Velocidade do FadeIn e Out</string>
-    </property>
-   </widget>
-  </widget>
-  <widget class="QGroupBox" name="groupBox_2">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>230</y>
-     <width>681</width>
-     <height>221</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>Caminhos</string>
-   </property>
-   <widget class="QLineEdit" name="music_path">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>60</y>
-      <width>601</width>
-      <height>26</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_5">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>35</y>
-      <width>151</width>
-      <height>18</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>9</pointsize>
-     </font>
-    </property>
-    <property name="text">
-     <string>Diretório de Músicas</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="jingle_path">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>120</y>
-      <width>601</width>
-      <height>26</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_6">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>98</y>
-      <width>221</width>
-      <height>18</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>9</pointsize>
-     </font>
-    </property>
-    <property name="text">
-     <string>Diretório de Vinhetas</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="time_path">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>180</y>
-      <width>601</width>
-      <height>26</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_7">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>160</y>
-      <width>221</width>
-      <height>18</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>9</pointsize>
-     </font>
-    </property>
-    <property name="text">
-     <string>Diretório de Horas</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="btn_searchMusicPath">
-    <property name="geometry">
-     <rect>
-      <x>620</x>
-      <y>60</y>
-      <width>51</width>
-      <height>26</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="icon">
-     <iconset theme="folder"/>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="btn_searchJinglePath">
-    <property name="geometry">
-     <rect>
-      <x>620</x>
-      <y>120</y>
-      <width>51</width>
-      <height>26</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="icon">
-     <iconset theme="folder"/>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="btn_searchTimePath">
-    <property name="geometry">
-     <rect>
-      <x>620</x>
-      <y>180</y>
-      <width>51</width>
-      <height>26</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="icon">
-     <iconset theme="folder"/>
-    </property>
-   </widget>
-  </widget>
-  <widget class="QLabel" name="label_8">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>480</y>
-     <width>431</width>
-     <height>18</height>
-    </rect>
-   </property>
-   <property name="font">
-    <font>
-     <pointsize>9</pointsize>
-    </font>
-   </property>
-   <property name="text">
-    <string>Atenção: para as alterações surtirem efeito, reinicie o LaraRadio.</string>
-   </property>
-  </widget>
+  <layout class="QVBoxLayout" name="verticalLayout_dialog">
+   <item>
+    <widget class="QTabWidget" name="tabWidget">
+     <property name="tabPosition">
+      <enum>QTabWidget::TabPosition::West</enum>
+     </property>
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <widget class="QWidget" name="tabFade">
+      <attribute name="title">
+       <string>Fade</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_fade">
+       <item>
+        <layout class="QFormLayout" name="formFade">
+         <item row="0" column="0">
+          <widget class="QLabel" name="label">
+           <property name="text">
+            <string>Sobrepôr Áudios (FadeIn e FadeOut)</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <layout class="QHBoxLayout" name="horizontalLayout_fadeTime">
+           <item>
+            <widget class="QSpinBox" name="fadeInOut"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_2">
+             <property name="text">
+              <string>Segundos</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_4">
+           <property name="text">
+            <string>Velocidade do FadeIn e Out</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <layout class="QHBoxLayout" name="horizontalLayout_speedFade">
+           <item>
+            <widget class="QSpinBox" name="speedFade"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_3">
+             <property name="text">
+              <string>Segundos</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="stopFade">
+         <property name="text">
+          <string>Usar FadeOut ao parar</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="talkFade">
+         <property name="text">
+          <string>Usar FadeOut e FadeIn ao clicar para falar</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_fade">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tabPaths">
+      <attribute name="title">
+       <string>Caminhos</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_paths">
+       <item>
+        <widget class="QLabel" name="label_5">
+         <property name="font">
+          <font>
+           <pointsize>9</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Diretório de Músicas</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_musicPath">
+         <item>
+          <widget class="QLineEdit" name="music_path"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_searchMusicPath">
+           <property name="text">
+            <string/>
+           </property>
+           <property name="icon">
+            <iconset theme="folder"/>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_6">
+         <property name="font">
+          <font>
+           <pointsize>9</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Diretório de Vinhetas</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_jinglePath">
+         <item>
+          <widget class="QLineEdit" name="jingle_path"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_searchJinglePath">
+           <property name="text">
+            <string/>
+           </property>
+           <property name="icon">
+            <iconset theme="folder"/>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_7">
+         <property name="font">
+          <font>
+           <pointsize>9</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Diretório de Horas</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_timePath">
+         <item>
+          <widget class="QLineEdit" name="time_path"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_searchTimePath">
+           <property name="text">
+            <string/>
+           </property>
+           <property name="icon">
+            <iconset theme="folder"/>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_paths">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tabOutputs">
+      <attribute name="title">
+       <string>Saídas</string>
+      </attribute>
+     </widget>
+     <widget class="QWidget" name="tabBehavior">
+      <attribute name="title">
+       <string>Comportamento</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_behavior">
+       <item>
+        <widget class="QCheckBox" name="sayClock">
+         <property name="text">
+          <string>Falar as horas ao clicar no relógio</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="sayClockFade">
+         <property name="text">
+          <string>Usar FadeIn e FadeOut ao falar as horas</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_behavior">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="label_8">
+     <property name="font">
+      <font>
+       <pointsize>9</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Atenção: para as alterações surtirem efeito, reinicie o LaraRadio.</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_buttons">
+     <item>
+      <spacer name="horizontalSpacer_buttons">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>10</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QDialogButtonBox" name="buttonBox">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="standardButtons">
+        <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Save</set>
+       </property>
+       <property name="centerButtons">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections>
