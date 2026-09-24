@@ -29,6 +29,9 @@ Fork: https://github.com/brdelphus/lararadio
   (imprevisível durante drags reais e após redimensionar a janela), então
   o arrastar e soltar funciona em qualquer tamanho de janela — inclusive
   depois de redimensionar.
+- **Tecla Del na playlist**: pressionar `Del` com a playlist
+  (`audio_list`) em foco remove o item selecionado — igual ao botão de
+  remover. Ignorada quando os navegadores de arquivos estão em foco.
 
 ### Alterado
 

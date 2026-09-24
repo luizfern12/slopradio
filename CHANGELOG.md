@@ -28,6 +28,9 @@ Fork: https://github.com/brdelphus/lararadio
   (which is unreliable during real drags and after window resizes), so
   drag & drop keeps working at any window size — including after the
   window is resized.
+- **Delete key on the playlist**: pressing `Del` while the playlist
+  (`audio_list`) has focus removes the selected item — same as the
+  remove button. Ignored while the file browsers have focus.
 
 ### Changed
 

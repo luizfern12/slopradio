@@ -271,6 +271,13 @@ void MainWindow::showEvent(QShowEvent *event)
 void MainWindow::keyPressEvent(QKeyEvent *event){
     int key = event->key();
 
+    // Del remove o item selecionado quando a playlist está em foco
+    if (key == Qt::Key_Delete && ui->audio_list->hasFocus()) {
+        on_btn_remove_item_clicked();
+        event->accept();
+        return;
+    }
+
     if (key >= Qt::Key_0 && key <= Qt::Key_9) {
         int index = key - Qt::Key_1;
         if (key == Qt::Key_0) index = 9;
