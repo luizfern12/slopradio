@@ -63,6 +63,10 @@ jobs:
           modules: qtmultimedia qtshadertools
           # Container runs as root; there is no sudo to call.
           install-deps: nosudo
+          # The default setup-python downloads a standalone Python built
+          # against glibc >= 2.38, which cannot run in the 22.04 container
+          # (glibc 2.35); use the container's apt python3 instead.
+          setup-python: 'false'
           cache: true
 
       - name: Build
