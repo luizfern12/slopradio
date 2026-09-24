@@ -29,6 +29,9 @@
 #include <QUrl>
 #include <QMimeData>
 #include <QFileInfo>
+#include <QSet>
+#include <algorithm>
+#include <functional>
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent), ui(new Ui::MainWindow)
@@ -501,15 +504,40 @@ void MainWindow::updateClockLabel(QString text_time)
 
 void MainWindow::on_btn_remove_item_clicked()
 {
-    int row = ui->audio_list->currentIndex().row();
-    if (row < 0 || row >= (int)playlist.size())
+    // coleta as linhas selecionadas; sem seleção, usa o item atual
+    QSet<int> rows;
+    for (QTreeWidgetItem *item : ui->audio_list->selectedItems())
+        rows.insert(ui->audio_list->indexOfTopLevelItem(item));
+
+    if (rows.isEmpty())
+        rows.insert(ui->audio_list->currentIndex().row());
+
+    // remove do fim para o início para não deslocar os índices ainda não removidos
+    QList<int> sortedRows = rows.values();
+    std::sort(sortedRows.begin(), sortedRows.end(), std::greater<int>());
+
+    bool removed = false;
+    for (int row : sortedRows) {
+        if (row < 0 || row >= (int)playlist.size())
+            continue;
+
+        // mantém current_play/next_play apontando para os mesmos itens
+        if (row < current_play) current_play--;
+        if (row < next_play) next_play--;
+
+        playlist.erase( playlist.begin() + row);
+        removed = true;
+    }
+
+    if (!removed)
         return;
-    playlist.erase( playlist.begin() + row);
+
     // Keep current_play/next_play valid after the playlist shrank
     if (current_play >= (int)playlist.size()) current_play = playlist.size() - 1;
     if (next_play >= (int)playlist.size()) next_play = playlist.size() - 1;
     if (current_play < 0) current_play = 0;
     if (next_play < 0) next_play = 0;
+
     updateAudioList();
 }
 

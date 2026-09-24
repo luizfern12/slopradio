@@ -31,6 +31,15 @@ Fork: https://github.com/brdelphus/lararadio
 - **Delete key on the playlist**: pressing `Del` while the playlist
   (`audio_list`) has focus removes the selected item — same as the
   remove button. Ignored while the file browsers have focus.
+- **Multi-selection on the playlist**: `ExtendedSelection` mode —
+  `Ctrl`+click for individual rows, `Shift`+click for ranges. The
+  remove button and the `Del` shortcut now remove **all** selected
+  rows at once (removing falls back to the current row when nothing
+  is selected, matching the old single-item behavior).
+- **Playback pointers survive removal**: `current_play`/`next_play` are
+  decremented for each removed row above them, so removing rows above
+  the currently-playing track keeps pointing at that same track (was
+  index-clamped only, which could skip tracks after a deletion).
 
 ### Changed
 

@@ -32,6 +32,16 @@ Fork: https://github.com/brdelphus/lararadio
 - **Tecla Del na playlist**: pressionar `Del` com a playlist
   (`audio_list`) em foco remove o item selecionado — igual ao botão de
   remover. Ignorada quando os navegadores de arquivos estão em foco.
+- **Multi seleção na playlist**: modo `ExtendedSelection` —
+  `Ctrl`+clique em linhas individuais, `Shift`+clique para intervalos.
+  O botão de remover e o atalho `Del` agora removem **todas** as linhas
+  selecionadas de uma vez (sem seleção, removem o item atual — igual ao
+  comportamento antigo de item único).
+- **Ponteiros de reprodução sobrevivem à remoção**:
+  `current_play`/`next_play` são decrementados para cada linha removida
+  acima deles, então remover linhas acima da faixa em reprodução
+  continua apontando para a mesma faixa (antes só ajustava o limite,
+  o que podia pular faixas após uma remoção).
 
 ### Alterado
 
