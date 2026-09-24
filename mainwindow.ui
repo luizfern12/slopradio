@@ -35,6 +35,9 @@
       <height>181</height>
      </rect>
     </property>
+    <property name="selectionMode">
+     <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+    </property>
    </widget>
    <widget class="QTreeWidget" name="audio_list">
     <property name="geometry">
@@ -573,6 +576,9 @@ QSlider::add-page:vertical {
       <width>461</width>
       <height>131</height>
      </rect>
+    </property>
+    <property name="selectionMode">
+     <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
     </property>
    </widget>
    <widget class="QLabel" name="label">
