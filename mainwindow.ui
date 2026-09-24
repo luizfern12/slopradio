@@ -45,7 +45,7 @@
       <x>530</x>
       <y>180</y>
       <width>501</width>
-      <height>361</height>
+      <height>310</height>
      </rect>
     </property>
     <property name="showDropIndicator" stdset="0">
@@ -660,6 +660,86 @@ QSlider::add-page:vertical {
      <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
     </property>
    </widget>
+    <widget class="QLabel" name="playlist_total_label">
+     <property name="geometry">
+      <rect>
+       <x>530</x>
+       <y>495</y>
+       <width>240</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>8</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Tempo total</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="playlist_total">
+     <property name="geometry">
+      <rect>
+       <x>530</x>
+       <y>511</y>
+       <width>240</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>14</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignmentFlag::AlignCenter</set>
+     </property>
+     <property name="text">
+      <string notr="true">0:00:00</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="playlist_finish_label">
+     <property name="geometry">
+      <rect>
+       <x>790</x>
+       <y>495</y>
+       <width>241</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>8</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Acaba às</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="playlist_finish">
+     <property name="geometry">
+      <rect>
+       <x>790</x>
+       <y>511</y>
+       <width>241</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>14</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignmentFlag::AlignCenter</set>
+     </property>
+     <property name="text">
+      <string notr="true">--:--</string>
+     </property>
+    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">

@@ -110,6 +110,36 @@ QStringList mediaFolderFilters()
     return filters;
 }
 
+// "M:SS" (minutes may exceed 59) or "H:MM:SS" -> seconds. Unknown or
+// malformed durations ("--:--", empty) count as 0 so the sums stay valid.
+qint64 parseDurationSecs(const QString &duration)
+{
+    const QStringList parts = duration.split(':');
+    if (parts.size() < 2 || parts.size() > 3)
+        return 0;
+
+    bool ok = true;
+    qint64 secs = 0;
+    int first = 0;
+    if (parts.size() == 3) {
+        secs += parts[0].toLongLong(&ok) * 3600;
+        first = 1;
+    }
+    secs += parts[first].toLongLong(&ok) * 60;
+    secs += parts.last().toLongLong(&ok);
+    return (ok && secs >= 0) ? secs : 0;
+}
+
+// Playlist totals are formatted H:MM:SS (hours unpadded) so multi-hour
+// playlists stay readable; individual tracks keep their M:SS column.
+QString formatDurationHMS(qint64 secs)
+{
+    return QString("%1:%2:%3")
+        .arg(secs / 3600)
+        .arg((secs / 60) % 60, 2, 10, QChar('0'))
+        .arg(secs % 60, 2, 10, QChar('0'));
+}
+
 } // namespace
 
 
@@ -833,15 +863,22 @@ void MainWindow::currentTimePosition(qint64 progress, int playerid)
 }
 void MainWindow::currentTimePositionClock(QTime time)
 {
-    if (!isPlaying)
+    if (!isPlaying) {
+        ui->playlist_finish->setText("--:--");
         return;
+    }
 
         qint64 remainingDuration = 0;
 
         if(audioplayer1.isPlaying() && audioplayer1.maxVolume>0)
             remainingDuration = audioplayer1.remainingTime();
 
-        if(audioplayer2.isPlaying() && audioplayer2.maxVolume>0)
+        // During a crossfade both decks play: keep the LONGEST remaining,
+        // which is the incoming track regardless of deck order. The old
+        // deck2-wins assignment pointed both finish times at the outgoing
+        // track whenever the incoming one was on deck1.
+        if(audioplayer2.isPlaying() && audioplayer2.maxVolume>0
+           && audioplayer2.remainingTime() > remainingDuration)
             remainingDuration = audioplayer2.remainingTime();
 
         QTime endTime = time.addSecs(remainingDuration / 1000);
@@ -849,6 +886,22 @@ void MainWindow::currentTimePositionClock(QTime time)
         // update remain time clock
         QString formattedTime = QString("<p align='center'>%1</p>").arg(endTime.toString("HH:mm:ss"));
         ui->over_at_time->setText(formattedTime);
+
+        // Playlist finish: the current track's remaining plus every track
+        // after it, up to the end of the playlist (first pass, no loop).
+        // Ignores the startTransitionAudioTime crossfade overlap — the same
+        // approximation the per-track finish above already makes.
+        if (playlist.empty() || current_play < 0 || current_play >= (int)playlist.size()) {
+            ui->playlist_finish->setText("--:--");
+            return;
+        }
+
+        qint64 restSecs = 0;
+        for (int i = current_play + 1; i < (int)playlist.size(); ++i)
+            restSecs += parseDurationSecs(playlist[i].duration);
+
+        QTime playlistEnd = time.addSecs(remainingDuration / 1000 + restSecs);
+        ui->playlist_finish->setText(playlistEnd.toString("HH:mm:ss"));
 
 }
 
@@ -1149,6 +1202,14 @@ void MainWindow::updateAudioList(bool jump)
             }
         }
     }
+
+    // Totals strip under the playlist: sum of every track's duration. All
+    // playlist mutations funnel through updateAudioList(), so this stays in
+    // sync on add/remove/clear/load automatically.
+    qint64 totalSecs = 0;
+    for (const auto &playlist_item : playlist)
+        totalSecs += parseDurationSecs(playlist_item.duration);
+    ui->playlist_total->setText(formatDurationHMS(totalSecs));
 
     //if(index!=current_play && index!=next_play && isPlaying)
         ui->audio_list->setCurrentItem( ui->audio_list->topLevelItem(index) );
