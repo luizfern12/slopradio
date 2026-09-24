@@ -65,6 +65,33 @@ Fork: https://github.com/brdelphus/lararadio
   configurações — apenas quando o dispositivo mudou de verdade, para
   não interromper a reprodução ao abrir o dialogo.
 
+#### `cuewindow.ui` / `cuewindow.h` / `cuewindow.cpp`
+- **Mini player de pré escuta (Pré Escuta)**: a ação "Pré Escuta" do
+  menu de contexto da playlist, antes desabilitada, agora abre uma
+  pequena janela de preview sempre visível (always-on-top) com
+  transporte próprio — barra de posição com tempos `mm:ss`, play/pause,
+  stop e um slider de volume dos fones. Toca a linha clicada (arquivos
+  `music`/`jingle`, um arquivo aleatório de pastas, o áudio da hora
+  certa) por um `AudioPlayer` dedicado que nunca se conecta ao VU
+  meter nem ao watchdog de silêncio, e nunca para sozinho — apenas os
+  próprios controles da janela ou fechá-la encerram a pré escuta.
+  Clicar em outra linha usa a mesma janela.
+
+#### `configdialog.ui` / `configdialog.cpp`
+- **Dispositivo de fones (aba Saídas)**: um segundo combo
+  (`Dispositivo de fones (cue)`, salvo em `audio/cueDevice`) roteia as
+  pré escutas para um dispositivo de fones dedicado; a primeira opção
+  (*Usar saída principal*) segue a saída principal. Os dois combos se
+  atualizam juntos ao plug/remove de dispositivos.
+
+#### `audioplayer.h` / `audioplayer.cpp`
+- **`configuredCueDevice()` / `Pause()`**: resolve o dispositivo de
+  cue salvo com fallback para a saída principal quando ausente ou
+  removido, e adiciona o estado de pausa para a janela de pré escuta.
+  O player de cue mantém `maxVolume` sincronizado com o slider de
+  volume para o timer de fade compartilhado não mexer no nível da
+  pré escuta.
+
 ### Alterado
 
 #### `mainwindow.ui` / `mainwindow.h` / `mainwindow.cpp`

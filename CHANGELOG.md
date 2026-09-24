@@ -62,6 +62,32 @@ Fork: https://github.com/brdelphus/lararadio
   only when the device actually changed, so opening the dialog
   mid-song doesn't interrupt playback.
 
+#### `cuewindow.ui` / `cuewindow.h` / `cuewindow.cpp`
+- **Pre-cue mini player (Pré Escuta)**: the previously disabled
+  "Pré Escuta" playlist context-menu action now opens a small
+  always-on-top preview window with its own transport — seek bar with
+  `mm:ss` times, play/pause, stop and a headphone volume slider. It
+  plays the right-clicked row (`music`/`jingle` files, a random file
+  from folder items, the current-hour time audio) through a dedicated
+  `AudioPlayer` that is never connected to the VU meter or silence
+  watchdog, and never stops on its own — only the window's own
+  controls or closing it end the preview. Picking another row
+  retargets the same window.
+
+#### `configdialog.ui` / `configdialog.cpp`
+- **Cue output device (Saídas tab)**: a second combo
+  (`Dispositivo de fones (cue)`, saved to `audio/cueDevice`) routes
+  previews to a dedicated headphone device; its first entry
+  (*Usar saída principal*) follows the main output. Both combos
+  refresh together on device hot-plug.
+
+#### `audioplayer.h` / `audioplayer.cpp`
+- **`configuredCueDevice()` / `Pause()`**: resolves the saved cue
+  device with fallback to the main output when unset or gone, and adds
+  a pause state for the pre-cue window. The cue player keeps
+  `maxVolume` in sync with its volume slider so the shared fade timer
+  never touches the preview level.
+
 ### Changed
 
 #### `mainwindow.ui` / `mainwindow.h` / `mainwindow.cpp`

@@ -138,6 +138,7 @@ void MainWindow::init()
     timeAudioOutput->setVolume(1.0f);
     timeAudioOutput->setDevice(outputDevice);
     m_appliedOutputDevice = outputDevice;
+    m_appliedCueDevice = AudioPlayer::configuredCueDevice();
 
     model = new QFileSystemModel(this);
     model->setRootPath( QDir::homePath() );
@@ -411,7 +412,9 @@ void MainWindow::audioOptionsMenu(QPoint pos)
     menu->addAction( deleteThis );
     menu->popup(ui->audio_list->viewport()->mapToGlobal(pos));
 
-    monitorThis->setEnabled(false);
+    connect(monitorThis, &QAction::triggered, this, [=]() {
+        cuePreview(index.row());
+    });
 
     connect(playThis, &QAction::triggered, this, [=]() {
         onPlaylistItemDoubleClicked(index);
@@ -425,6 +428,48 @@ void MainWindow::audioOptionsMenu(QPoint pos)
         updateAudioList(true);
         ui->audio_list->clearSelection();
     });
+}
+
+void MainWindow::cuePreview(int row)
+{
+    if (row < 0 || row >= (int)playlist.size())
+        return;
+
+    const Playlist &item = playlist[row];
+    QString path = item.path;
+
+    if (item.type == "folder-music" || item.type == "folder-jingle") {
+        // same random pick the air playback does for folder items
+        QDir audioDir(path);
+        QStringList filters;
+        filters << "*.mp3" << "*.wav" << "*.ogg" << "*.flac" << "*.mp4";
+        QStringList audioFiles = audioDir.entryList(filters, QDir::Files);
+
+        if (audioFiles.isEmpty()) {
+            qWarning() << "Pre-cue: no audio files in folder" << path;
+            return;
+        }
+
+        int randomIndex = QRandomGenerator::global()->bounded(audioFiles.size());
+        path = audioDir.absoluteFilePath(audioFiles.at(randomIndex));
+    } else if (item.type == "time") {
+        path = time_audio_path + "/" + SayTimeAudio + ".mp3";
+    }
+
+    if (!QFile::exists(path)) {
+        qWarning() << "Pre-cue: file not found:" << path;
+        return;
+    }
+
+    if (!m_cueWindow) {
+        m_cueWindow = new CueWindow(this);
+        m_cueWindow->setOutputDevice(AudioPlayer::configuredCueDevice());
+    }
+
+    m_cueWindow->loadAndPlay(path, item.name);
+    m_cueWindow->show();
+    m_cueWindow->raise();
+    m_cueWindow->activateWindow();
 }
 
 void MainWindow::unSelectedJingle()
@@ -1172,20 +1217,27 @@ void MainWindow::showConfigDialog()
 void MainWindow::applyAudioOutputDevice()
 {
     QAudioDevice device = AudioPlayer::configuredAudioDevice();
+    QAudioDevice cueDevice = AudioPlayer::configuredCueDevice();
 
-    // skip when nothing changed, so closing the dialog doesn't disturb playback
-    if (device == m_appliedOutputDevice)
-        return;
+    // skip unchanged devices, so closing the dialog doesn't disturb playback
+    if (device != m_appliedOutputDevice) {
+        audioplayer1.setAudioDevice(device);
+        audioplayer2.setAudioDevice(device);
+        if (timeAudioOutput)
+            timeAudioOutput->setDevice(device);
 
-    audioplayer1.setAudioDevice(device);
-    audioplayer2.setAudioDevice(device);
-    if (timeAudioOutput)
-        timeAudioOutput->setDevice(device);
+        for (ButtonHole *hole : buttonHole)
+            hole->setAudioDevice(device);
 
-    for (ButtonHole *hole : buttonHole)
-        hole->setAudioDevice(device);
+        m_appliedOutputDevice = device;
+    }
 
-    m_appliedOutputDevice = device;
+    if (cueDevice != m_appliedCueDevice) {
+        if (m_cueWindow)
+            m_cueWindow->setOutputDevice(cueDevice);
+
+        m_appliedCueDevice = cueDevice;
+    }
 }
 
 void MainWindow::savePlaylist()

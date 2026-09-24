@@ -9,6 +9,7 @@
 #include "timerclock.h"
 #include "vumeter.h"
 #include "buttonhole.h"
+#include "cuewindow.h"
 #include "QAudioOutput"
 #include "QFileSystemModel"
 #include <QProgressBar>
@@ -119,6 +120,7 @@ private:
     void snapshotDesignGeometry();
     void scaleWidgets();
     void applyAudioOutputDevice();
+    void cuePreview(int row);
 
     Ui::MainWindow *ui;
     AudioPlayer audioplayer1;
@@ -126,6 +128,8 @@ private:
     QMediaPlayer *timeplayer;
     QAudioOutput *timeAudioOutput = nullptr;
     QAudioDevice m_appliedOutputDevice;
+    QAudioDevice m_appliedCueDevice;
+    CueWindow *m_cueWindow = nullptr;
     std::vector<Playlist> playlist;
 
     QFileSystemModel *model;

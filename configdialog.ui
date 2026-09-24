@@ -225,6 +225,16 @@
         <widget class="QComboBox" name="output_device"/>
        </item>
        <item>
+        <widget class="QLabel" name="label_10">
+         <property name="text">
+          <string>Dispositivo de fones (cue)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="cue_device"/>
+       </item>
+       <item>
         <spacer name="verticalSpacer_outputs">
          <property name="orientation">
           <enum>Qt::Orientation::Vertical</enum>

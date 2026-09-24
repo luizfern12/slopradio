@@ -23,6 +23,7 @@ class AudioPlayer: public QObject
         ~AudioPlayer();
         void Reset();
         void Play();
+        void Pause();
         void Stop();
         void addMedia(QString file);
         void Seek(int mseconds);
@@ -42,6 +43,7 @@ class AudioPlayer: public QObject
         bool hasError() const { return m_hasError; }
         static bool isValidMediaFile(const QString &path);
         static QAudioDevice configuredAudioDevice();
+        static QAudioDevice configuredCueDevice();
 
     signals:
         void update_position(qint64 position);

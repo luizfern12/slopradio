@@ -58,6 +58,11 @@ void AudioPlayer::Play()
         player->play();
 }
 
+void AudioPlayer::Pause()
+{
+    player->pause();
+}
+
 void AudioPlayer::Stop()
 {
     player->stop();
@@ -192,4 +197,22 @@ QAudioDevice AudioPlayer::configuredAudioDevice()
 
     // nothing saved (or the saved device is gone): system default
     return QMediaDevices::defaultAudioOutput();
+}
+
+QAudioDevice AudioPlayer::configuredCueDevice()
+{
+    QSettings settings("LaraRadio", "LaraRadio");
+    const QByteArray wantedId = settings.value("audio/cueDevice").toByteArray();
+
+    if (!wantedId.isEmpty()) {
+        const QList<QAudioDevice> devices = QMediaDevices::audioOutputs();
+        for (const QAudioDevice &device : devices) {
+            if (device.id() == wantedId)
+                return device;
+        }
+        // saved cue device is gone: fall through to the main output
+    }
+
+    // no cue device saved: preview through the main output
+    return configuredAudioDevice();
 }

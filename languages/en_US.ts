@@ -231,6 +231,14 @@
         <translation>System default</translation>
     </message>
     <message>
+        <source>Dispositivo de fones (cue)</source>
+        <translation>Headphone device (cue)</translation>
+    </message>
+    <message>
+        <source>Usar saída principal</source>
+        <translation>Use main output</translation>
+    </message>
+    <message>
         <location filename="../build/Desktop_Qt_6_9_1-Debug/LaraRadio/configdialog.ui" line="209"/>
         <location filename="../build/Desktop_Qt_6_9_1-Release/LaraRadio/configdialog.ui" line="209"/>
         <location filename="../configdialog.ui" line="209"/>

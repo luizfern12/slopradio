@@ -77,6 +77,8 @@ qt_add_qml_module(appLaraRadio
         RESOURCES resources.qrc
         SOURCES configdialog.h configdialog.cpp
         RESOURCES configdialog.ui
+        SOURCES cuewindow.h cuewindow.cpp
+        RESOURCES cuewindow.ui
         SOURCES custonIconProvider.h
         SOURCES version.h.in
         RESOURCES

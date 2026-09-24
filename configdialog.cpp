@@ -27,12 +27,16 @@ ConfigDialog::ConfigDialog(QWidget *parent)
     ui->stopFade->setChecked( settings.value("volume/stopFade").toBool() );
     ui->talkFade->setChecked( settings.value("volume/talkFade").toBool() );
 
-    populateOutputDevices( settings.value("audio/outputDevice").toByteArray() );
+    populateOutputDevices( settings.value("audio/outputDevice").toByteArray(),
+                           settings.value("audio/cueDevice").toByteArray() );
 
-    // keep the device list in sync while the dialog is open (hot-plug)
+    // keep the device lists in sync while the dialog is open (hot-plug)
     QMediaDevices *mediaDevices = new QMediaDevices(this);
     connect(mediaDevices, &QMediaDevices::audioOutputsChanged, this,
-            [this]() { populateOutputDevices(ui->output_device->currentData().toByteArray()); });
+            [this]() {
+                populateOutputDevices(ui->output_device->currentData().toByteArray(),
+                                      ui->cue_device->currentData().toByteArray());
+            });
 
     connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
 }
@@ -54,6 +58,7 @@ void ConfigDialog::accept()
     settings.setValue("volume/stopFade", ui->stopFade->isChecked());
     settings.setValue("volume/talkFade", ui->talkFade->isChecked());
     settings.setValue("audio/outputDevice", ui->output_device->currentData().toByteArray());
+    settings.setValue("audio/cueDevice", ui->cue_device->currentData().toByteArray());
 
     this->close();
 }
@@ -82,21 +87,27 @@ void ConfigDialog::on_btn_searchTimePath_clicked()
     }
 }
 
-void ConfigDialog::populateOutputDevices(const QByteArray &selectId)
+void ConfigDialog::populateOutputDevices(const QByteArray &selectId, const QByteArray &selectCueId)
 {
-    ui->output_device->clear();
-    ui->output_device->addItem(tr("Padrão do sistema"), QByteArray());
+    fillDeviceCombo(ui->output_device, selectId, tr("Padrão do sistema"));
+    fillDeviceCombo(ui->cue_device, selectCueId, tr("Usar saída principal"));
+}
+
+void ConfigDialog::fillDeviceCombo(QComboBox *combo, const QByteArray &selectId, const QString &defaultLabel)
+{
+    combo->clear();
+    combo->addItem(defaultLabel, QByteArray());
 
     int selectIndex = selectId.isEmpty() ? 0 : -1;
 
     const QList<QAudioDevice> devices = QMediaDevices::audioOutputs();
     for (const QAudioDevice &device : devices) {
-        ui->output_device->addItem(device.description(), device.id());
+        combo->addItem(device.description(), device.id());
         if (device.id() == selectId)
-            selectIndex = ui->output_device->count() - 1;
+            selectIndex = combo->count() - 1;
     }
 
-    // saved device is gone: keep the system default selected
+    // saved device is gone: keep the first entry selected
     if (selectIndex >= 0)
-        ui->output_device->setCurrentIndex(selectIndex);
+        combo->setCurrentIndex(selectIndex);
 }

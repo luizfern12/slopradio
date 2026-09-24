@@ -12,6 +12,8 @@ namespace Ui {
 class ConfigDialog;
 }
 
+class QComboBox;
+
 class ConfigDialog : public QDialog
 {
     Q_OBJECT
@@ -30,7 +32,8 @@ private slots:
     void on_btn_searchTimePath_clicked();
 
 private:
-    void populateOutputDevices(const QByteArray &selectId);
+    void populateOutputDevices(const QByteArray &selectId, const QByteArray &selectCueId);
+    void fillDeviceCombo(QComboBox *combo, const QByteArray &selectId, const QString &defaultLabel);
 
     Ui::ConfigDialog *ui;
 
