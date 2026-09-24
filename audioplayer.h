@@ -6,6 +6,8 @@
 #include <QAudioOutput>
 #include <QAudioBufferOutput>
 #include <QAudioDevice>
+#include <QVideoSink>
+#include <QVideoFrame>
 
 class AudioPlayer: public QObject
 {
@@ -40,6 +42,8 @@ class AudioPlayer: public QObject
         void fadeIn();
         void fade();
         void setBuffer(QAudioBufferOutput *output);
+        QVideoSink *videoSink() const { return m_videoSink; }
+        bool isVideoActive() const;
         bool hasError() const { return m_hasError; }
         static bool isValidMediaFile(const QString &path);
         static QAudioDevice configuredAudioDevice();
@@ -59,6 +63,8 @@ class AudioPlayer: public QObject
         QMediaPlayer *player;
         QAudioOutput *audioOutput;
         QAudioBufferOutput *audioBufferOutput = nullptr;
+        QVideoSink *m_videoSink = nullptr;
+        qint64 m_lastVideoFrameMs = -1;
         QString cleanFilePath;
         bool m_hasError = false;
 

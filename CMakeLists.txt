@@ -43,7 +43,7 @@ project(appLaraRadio VERSION ${PROJECT_VERSION} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Widgets Multimedia MultimediaWidgets)
+find_package(Qt6 REQUIRED COMPONENTS Quick Widgets Multimedia MultimediaWidgets OpenGL OpenGLWidgets)
 set(QT_USE_QTMULTIMEDIA TRUE)
 set(QT_USE_QTMULTIMEDIAWIDGETS TRUE)
 set(QT_DEBUG_PLUGINS TRUE)
@@ -79,6 +79,9 @@ qt_add_qml_module(appLaraRadio
         RESOURCES configdialog.ui
         SOURCES cuewindow.h cuewindow.cpp
         RESOURCES cuewindow.ui
+        SOURCES videomixer.h videomixer.cpp
+        SOURCES videowindow.h videowindow.cpp
+        RESOURCES videowindow.ui
         SOURCES custonIconProvider.h
         SOURCES version.h.in
         RESOURCES
@@ -105,6 +108,8 @@ target_link_libraries(appLaraRadio
     Qt6::Widgets
     Qt6::Multimedia
     Qt6::MultimediaWidgets
+    Qt6::OpenGL
+    Qt6::OpenGLWidgets
     tag
 )
 

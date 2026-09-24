@@ -30,6 +30,7 @@ private slots:
     void on_btn_searchMusicPath_clicked();
     void on_btn_searchJinglePath_clicked();
     void on_btn_searchTimePath_clicked();
+    void on_btn_searchShaderDir_clicked();
 
 private:
     void populateOutputDevices(const QByteArray &selectId, const QByteArray &selectCueId);

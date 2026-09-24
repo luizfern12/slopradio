@@ -19,6 +19,13 @@ public:
             return QIcon(":/images/icons/audio-x-generic.png"); // Ícone de áudio
         }
 
+        if (suffix == "mp4" || suffix == "mkv" || suffix == "webm" || suffix == "mov"
+            || suffix == "avi" || suffix == "m4v") {
+            // Ícone de vídeo (tema do sistema, com fallback genérico)
+            return QIcon::fromTheme("video-x-generic",
+                                    QIcon(":/images/icons/system-component-codecs.png"));
+        }
+
         return QFileIconProvider::icon(info); // Ícone padrão
     }
 };

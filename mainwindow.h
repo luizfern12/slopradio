@@ -10,6 +10,7 @@
 #include "vumeter.h"
 #include "buttonhole.h"
 #include "cuewindow.h"
+#include "videowindow.h"
 #include "QAudioOutput"
 #include "QFileSystemModel"
 #include <QProgressBar>
@@ -111,6 +112,8 @@ private slots:
 
     void showAboutDialog();
     void showConfigDialog();
+    void toggleVideoWindow(bool enabled);
+    void applyVideoOptions();
 
 private:
     QAudioFormat getAudioFormat();
@@ -130,6 +133,8 @@ private:
     QAudioDevice m_appliedOutputDevice;
     QAudioDevice m_appliedCueDevice;
     CueWindow *m_cueWindow = nullptr;
+    VideoWindow *m_videoWindow = nullptr;
+    bool m_videoWindowShown = false;
     std::vector<Playlist> playlist;
 
     QFileSystemModel *model;

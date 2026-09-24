@@ -44,5 +44,13 @@
         <file>images/splash-01.png</file>
         <file>images/splash-02.png</file>
         <file>images/brazil-brand.png</file>
+        <file>shaders/fullscreen.vert</file>
+        <file>shaders/crossfade.frag</file>
+        <file>shaders/wipe.frag</file>
+        <file>shaders/slide.frag</file>
+        <file>shaders/circleopen.frag</file>
+        <file>shaders/flip3d.frag</file>
+        <file>shaders/cube3d.frag</file>
+        <file>shaders/rotate3d.frag</file>
     </qresource>
 </RCC>

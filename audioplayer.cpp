@@ -10,6 +10,9 @@
 #include <QDir>
 #include <QSettings>
 #include <QMediaDevices>
+#include <QDateTime>
+#include <QVideoSink>
+#include <QVideoFrame>
 
 AudioPlayer::AudioPlayer()
 {
@@ -20,6 +23,14 @@ AudioPlayer::AudioPlayer()
 
     player->setAudioOutput(audioOutput);
     audioOutput->setVolume(1.0);
+
+    // Video sink so the video pipeline can tap the frames this player decodes.
+    // Attaching a sink is harmless for pure-audio files (no frames arrive).
+    m_videoSink = new QVideoSink;
+    player->setVideoSink(m_videoSink);
+    connect(m_videoSink, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame &) {
+        m_lastVideoFrameMs = QDateTime::currentMSecsSinceEpoch();
+    });
 
     connect(player, &QMediaPlayer::positionChanged, this, &AudioPlayer::positionChanged);
     connect(player, &QMediaPlayer::errorOccurred, this, &AudioPlayer::onPlayerError);
@@ -37,6 +48,19 @@ AudioPlayer::~AudioPlayer()
 {
     delete player;
     delete audioOutput;
+    delete m_videoSink;
+}
+
+bool AudioPlayer::isVideoActive() const
+{
+    // A video stream is being decoded right now if we have received a frame
+    // within the last 2s and the player hasn't been stopped. Sub-second media
+    // with no audio track still counts as "active" because frames keep flowing.
+    if (m_lastVideoFrameMs < 0)
+        return false;
+    if (player->playbackState() == QMediaPlayer::StoppedState)
+        return false;
+    return (QDateTime::currentMSecsSinceEpoch() - m_lastVideoFrameMs) < 2000;
 }
 
 void AudioPlayer::Reset()
@@ -50,6 +74,7 @@ void AudioPlayer::Reset()
     maxVolume = 1.0f;
     current_length = 0;
     m_hasError = false;
+    m_lastVideoFrameMs = -1;
 }
 
 void AudioPlayer::Play()

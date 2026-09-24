@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "about_dialog.h"
 #include "configdialog.h"
+#include "videomixer.h"
 #include "custonIconProvider.h"
 #include <QMessageBox>
 #include "QFileSystemModel"
@@ -30,8 +31,86 @@
 #include <QMimeData>
 #include <QFileInfo>
 #include <QSet>
+#include <QProcess>
 #include <algorithm>
 #include <functional>
+
+namespace {
+
+// Containers we treat as playable "video" media. Everything else that lands
+// in the playlist keeps behaving exactly like audio.
+const QStringList &videoExtensions()
+{
+    static const QStringList exts = {
+        "mp4", "mkv", "webm", "mov", "avi", "m4v"
+    };
+    return exts;
+}
+
+const QStringList &audioExtensions()
+{
+    static const QStringList exts = { "mp3", "wav", "ogg", "flac" };
+    return exts;
+}
+
+bool isVideoFile(const QString &path)
+{
+    return videoExtensions().contains(QFileInfo(path).suffix().toLower());
+}
+
+bool isMediaFile(const QString &path)
+{
+    const QString s = QFileInfo(path).suffix().toLower();
+    return videoExtensions().contains(s) || audioExtensions().contains(s);
+}
+
+// "clip.mp4" -> "clip" for display
+QString stripMediaExtension(QString name)
+{
+    const int dot = name.lastIndexOf('.');
+    if (dot > 0) {
+        const QString suffix = name.mid(dot + 1).toLower();
+        if (videoExtensions().contains(suffix) || audioExtensions().contains(suffix))
+            name.chop(name.length() - dot);
+    }
+    return name;
+}
+
+// Duration fallback for containers TagLib cannot read (mkv, webm, avi, mov).
+// Uses ffprobe, the same tool AudioPlayer::isValidMediaFile already relies on.
+QString probeDuration(const QString &path)
+{
+    QProcess ffprobe;
+    ffprobe.start("ffprobe", {
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        path
+    });
+    if (!ffprobe.waitForFinished(5000) || ffprobe.exitCode() != 0)
+        return "";
+
+    bool ok = false;
+    const double secs = QString::fromUtf8(ffprobe.readAllStandardOutput()).trimmed().toDouble(&ok);
+    if (!ok || secs <= 0.0)
+        return "";
+
+    const int total = int(secs);
+    return QString("%1:%2").arg(total / 60, 2, 10, QChar('0')).arg(total % 60, 2, 10, QChar('0'));
+}
+
+// Folder playlists pick a random file: match audio and video alike.
+QStringList mediaFolderFilters()
+{
+    QStringList filters;
+    for (const QString &ext : audioExtensions())
+        filters << "*." + ext;
+    for (const QString &ext : videoExtensions())
+        filters << "*." + ext;
+    return filters;
+}
+
+} // namespace
 
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent), ui(new Ui::MainWindow)
@@ -106,6 +185,10 @@ void MainWindow::initConfig()
     if(!settings->contains("files/audioTimeDir")) settings->setValue("files/audioTimeDir", QDir::homePath());
 
     if(!settings->contains("interface/language")) settings->setValue("interface/language", "en_US");
+
+    if(!settings->contains("video/enabled")) settings->setValue("video/enabled", false);
+    if(!settings->contains("video/transition")) settings->setValue("video/transition", "crossfade");
+    if(!settings->contains("video/shaderDir")) settings->setValue("video/shaderDir", "");
 }
 
 void MainWindow::init()
@@ -206,6 +289,27 @@ void MainWindow::init()
     connect(&audioplayer2, &AudioPlayer::playbackFinished, this, [=]() {
         if (isPlaying) checkAdvanceTrack();
     });
+
+    // ---- Video output window ------------------------------------------
+    connect(ui->btn_video, &QPushButton::toggled, this, &MainWindow::toggleVideoWindow);
+
+    // create the video window eagerly (cheap: it stays hidden until enabled)
+    m_videoWindow = new VideoWindow(this);
+    m_videoWindow->attachToPlayers(&audioplayer1, &audioplayer2);
+    connect(m_videoWindow, &VideoWindow::closed, this, [this]() {
+        m_videoWindowShown = false;
+        ui->btn_video->setChecked(false);
+        settings->setValue("video/enabled", false);
+    });
+    applyVideoOptions();
+
+    // show it at startup if the user left it enabled last session
+    if (settings->value("video/enabled", false).toBool()) {
+        m_videoWindowShown = true;
+        ui->btn_video->setChecked(true);
+        m_videoWindow->show();
+        m_videoWindow->raise();
+    }
 
     ui->version->setText( tr("Versão: ") + QString(APP_VERSION) );
     ui->volume_speak->setValue( volumeToTalk * 100 );
@@ -441,8 +545,7 @@ void MainWindow::cuePreview(int row)
     if (item.type == "folder-music" || item.type == "folder-jingle") {
         // same random pick the air playback does for folder items
         QDir audioDir(path);
-        QStringList filters;
-        filters << "*.mp3" << "*.wav" << "*.ogg" << "*.flac" << "*.mp4";
+        QStringList filters = mediaFolderFilters(); // audio + video
         QStringList audioFiles = audioDir.entryList(filters, QDir::Files);
 
         if (audioFiles.isEmpty()) {
@@ -499,10 +602,7 @@ void MainWindow::addFileToPlaylist(const QString &filepath, const QString &type)
     }
 
     QString filename = info.fileName();
-    filename = filename.remove(".mp3");
-    filename = filename.remove(".wav");
-    filename = filename.remove(".flac");
-    filename = filename.remove(".ogg");
+    filename = stripMediaExtension(filename);
 
     QString duration = "";
     TagLib::FileRef aud(filepath.toStdString().c_str());
@@ -517,6 +617,9 @@ void MainWindow::addFileToPlaylist(const QString &filepath, const QString &type)
             filename = QString::fromStdString( aud.tag()->title().toCString(true) ) + " - " + QString::fromStdString( aud.tag()->artist().toCString(true) );
         }
     }
+
+    if (duration.isEmpty())
+        duration = probeDuration(filepath); // video containers TagLib skips
 
     playlist.push_back({filename, filepath, duration, type});
     updateAudioList();
@@ -618,10 +721,7 @@ void MainWindow::on_btn_add_item_clicked()
         if(filename=="")
             return;
 
-        filename = filename.remove(".mp3");
-        filename = filename.remove(".wav");
-        filename = filename.remove(".flac");
-        filename = filename.remove(".ogg");
+        filename = stripMediaExtension(filename);
 
 
         if(type!="folder"){
@@ -637,6 +737,9 @@ void MainWindow::on_btn_add_item_clicked()
                     filename = QString::fromStdString( aud.tag()->title().toCString(true) ) + " - " + QString::fromStdString( aud.tag()->artist().toCString(true) );
                 }
             }
+
+            if (duration == "--:--")
+                duration = probeDuration(filepath); // video containers TagLib skips
         }
 
         if(index>=0){
@@ -887,8 +990,7 @@ void MainWindow::next()
             if(type=="folder-music" || type=="folder-jingle"){
 
                 QDir audioDir( path );
-                QStringList filters;
-                filters << "*.mp3" << "*.wav" << "*.ogg" << "*.flac" << "*.mp4"; // Add other formats as needed
+                QStringList filters = mediaFolderFilters(); // audio + video
                 QStringList audioFiles = audioDir.entryList(filters, QDir::Files);
 
 
@@ -911,6 +1013,7 @@ void MainWindow::next()
                     audioplayer1.addMedia( path );
                     audioplayer1.Play();
                     audioplayer1.fadeIn();
+                    if (m_videoWindow) m_videoWindow->setIncomingDeck(1);
 
                 } else if(
                     (audioplayer1.isPlaying())
@@ -922,6 +1025,7 @@ void MainWindow::next()
                     audioplayer2.addMedia( path );
                     audioplayer2.Play();
                     audioplayer2.fadeIn();
+                    if (m_videoWindow) m_videoWindow->setIncomingDeck(2);
                 }
             }
 
@@ -932,6 +1036,7 @@ void MainWindow::next()
                     audioplayer1.maxVolume = 1.0f;
                     audioplayer1.setVolume( audioplayer1.maxVolume );
                     audioplayer1.Play();
+                    if (m_videoWindow) m_videoWindow->setIncomingDeck(1);
 
                 } else if(
                     (audioplayer1.isPlaying())
@@ -944,6 +1049,7 @@ void MainWindow::next()
                     audioplayer2.maxVolume = 1.0f;
                     audioplayer2.setVolume( audioplayer2.maxVolume );
                     audioplayer2.Play();
+                    if (m_videoWindow) m_videoWindow->setIncomingDeck(2);
                 }
             }
         }
@@ -991,8 +1097,13 @@ void MainWindow::updateAudioList(bool jump)
     for(auto& playlist_item : playlist){
         QTreeWidgetItem *item = new QTreeWidgetItem(ui->audio_list);
 
-        if(playlist_item.type=="music")
-            item->setIcon(0, QIcon(":/images/icons/audio-x-generic.png"));
+        if(playlist_item.type=="music"){
+            if (isVideoFile(playlist_item.path))
+                item->setIcon(0, QIcon::fromTheme("video-x-generic",
+                                                   QIcon(":/images/icons/audio-x-generic.png")));
+            else
+                item->setIcon(0, QIcon(":/images/icons/audio-x-generic.png"));
+        }
 
         if(playlist_item.type=="jingle")
             item->setIcon(0, QIcon(":/images/icons/audio-x-mpegurl.png"));
@@ -1064,7 +1175,11 @@ void MainWindow::updateDisplay() {
         const int SILENCE_TIMEOUT = 10000; // 10 seconds
         bool vuActive = (currentVU_L > 0 || currentVU_R > 0);
 
-        if (!audioplayer1.isFading && !audioplayer2.isFading && !vuActive) {
+        // A running video counts as "alive" even when it has no audio track,
+        // so the watchdog must not skip silent video items.
+        bool videoActive = audioplayer1.isVideoActive() || audioplayer2.isVideoActive();
+
+        if (!audioplayer1.isFading && !audioplayer2.isFading && !vuActive && !videoActive) {
             m_silenceMs += 10; // displayTimer interval
             if (m_silenceMs >= SILENCE_TIMEOUT) {
                 qWarning() << "Silence watchdog: no audio for" << SILENCE_TIMEOUT
@@ -1212,6 +1327,8 @@ void MainWindow::showConfigDialog()
 
     // the output device (or the device list) may have changed in the dialog
     applyAudioOutputDevice();
+    // the transition effect / shader folder may have changed too
+    applyVideoOptions();
 }
 
 void MainWindow::applyAudioOutputDevice()
@@ -1238,6 +1355,35 @@ void MainWindow::applyAudioOutputDevice()
 
         m_appliedCueDevice = cueDevice;
     }
+}
+
+void MainWindow::toggleVideoWindow(bool enabled)
+{
+    if (!m_videoWindow)
+        return;
+
+    if (enabled) {
+        m_videoWindowShown = true;
+        m_videoWindow->show();
+        m_videoWindow->raise();
+        m_videoWindow->activateWindow();
+        settings->setValue("video/enabled", true);
+    } else {
+        m_videoWindowShown = false;
+        m_videoWindow->hide();
+        settings->setValue("video/enabled", false);
+    }
+}
+
+void MainWindow::applyVideoOptions()
+{
+    if (!m_videoWindow || !m_videoWindow->mixer())
+        return;
+
+    const QString shaderDir = settings->value("video/shaderDir").toString();
+    VideoMixer *mixer = m_videoWindow->mixer();
+    mixer->setEffects(VideoMixer::availableEffects(shaderDir));
+    mixer->setCurrentEffect(settings->value("video/transition", "crossfade").toString());
 }
 
 void MainWindow::savePlaylist()

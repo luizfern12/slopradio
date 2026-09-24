@@ -283,6 +283,85 @@
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="tabVideo">
+      <attribute name="title">
+       <string>Vídeo</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_video">
+       <item>
+        <widget class="QLabel" name="label_videoTransition">
+         <property name="font">
+          <font>
+           <pointsize>9</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Efeito de transição do vídeo (durante o crossfade de áudio)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="video_transition"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_videoShaderDir">
+         <property name="font">
+          <font>
+           <pointsize>9</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Pasta de shaders personalizados (.frag, opcional .vert)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_shaderDir">
+         <item>
+          <widget class="QLineEdit" name="video_shaderDir"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_searchShaderDir">
+           <property name="text">
+            <string/>
+           </property>
+           <property name="icon">
+            <iconset theme="folder"/>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_videoHint">
+         <property name="font">
+          <font>
+           <pointsize>9</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Cada .frag vira um efeito; um .vert com o mesmo nome substitui o vértice padrão (permite shaders 3D).</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_video">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
    <item>

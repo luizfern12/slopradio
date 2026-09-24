@@ -1,5 +1,6 @@
 #include "configdialog.h"
 #include "ui_configdialog.h"
+#include "videomixer.h"
 #include <QMediaDevices>
 #include <QAudioDevice>
 
@@ -26,6 +27,17 @@ ConfigDialog::ConfigDialog(QWidget *parent)
 
     ui->stopFade->setChecked( settings.value("volume/stopFade").toBool() );
     ui->talkFade->setChecked( settings.value("volume/talkFade").toBool() );
+
+    // video tab: transition effect list (built-ins + custom shader folder)
+    const QString shaderDir = settings.value("video/shaderDir").toString();
+    const QList<VideoMixer::Effect> effects = VideoMixer::availableEffects(shaderDir);
+    for (const VideoMixer::Effect &e : effects)
+        ui->video_transition->addItem(e.displayName, e.id);
+    ui->video_shaderDir->setText(shaderDir);
+
+    const QString wantedEffect = settings.value("video/transition", "crossfade").toString();
+    const int idx = ui->video_transition->findData(wantedEffect);
+    ui->video_transition->setCurrentIndex(idx >= 0 ? idx : 0);
 
     populateOutputDevices( settings.value("audio/outputDevice").toByteArray(),
                            settings.value("audio/cueDevice").toByteArray() );
@@ -59,6 +71,8 @@ void ConfigDialog::accept()
     settings.setValue("volume/talkFade", ui->talkFade->isChecked());
     settings.setValue("audio/outputDevice", ui->output_device->currentData().toByteArray());
     settings.setValue("audio/cueDevice", ui->cue_device->currentData().toByteArray());
+    settings.setValue("video/transition", ui->video_transition->currentData().toString());
+    settings.setValue("video/shaderDir", ui->video_shaderDir->text());
 
     this->close();
 }
@@ -84,6 +98,17 @@ void ConfigDialog::on_btn_searchTimePath_clicked()
     QString dir = QFileDialog::getExistingDirectory(this, tr("Selecionar pasta de Locução de Hora"), settings.value("files/audioTimeDir", QDir::homePath()).toString());
     if (!dir.isEmpty()) {
         ui->time_path->setText(dir);
+    }
+}
+
+void ConfigDialog::on_btn_searchShaderDir_clicked()
+{
+    QString start = ui->video_shaderDir->text().isEmpty()
+        ? QDir::homePath() : ui->video_shaderDir->text();
+    QString dir = QFileDialog::getExistingDirectory(this,
+        tr("Selecionar pasta de shaders do vídeo"), start);
+    if (!dir.isEmpty()) {
+        ui->video_shaderDir->setText(dir);
     }
 }
 

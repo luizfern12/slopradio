@@ -517,6 +517,28 @@ QSlider::add-page:vertical {
      </size>
     </property>
    </widget>
+   <widget class="QPushButton" name="btn_video">
+    <property name="geometry">
+     <rect>
+      <x>645</x>
+      <y>124</y>
+      <width>60</width>
+      <height>26</height>
+     </rect>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::FocusPolicy::NoFocus</enum>
+    </property>
+    <property name="toolTip">
+     <string>Ligar/Desligar a janela de vídeo</string>
+    </property>
+    <property name="checkable">
+     <bool>true</bool>
+    </property>
+    <property name="text">
+     <string>Vídeo</string>
+    </property>
+   </widget>
    <widget class="QPushButton" name="btn_add_item">
     <property name="geometry">
      <rect>
