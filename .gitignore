@@ -3,6 +3,8 @@ _build*/
 out*/
 *.appdir/
 *.AppDir/
+AppDir/
+dist/
 
 *.exe
 *.out

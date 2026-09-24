@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=LaraRadio
+GenericName=Radio Automation
+Comment=Automated radio playout with jingles and time announcements
+Exec=appLaraRadio %u
+Icon=lararadio
+Categories=AudioVideo;Audio;Player;
+Terminal=false
+StartupNotify=true
