@@ -22,8 +22,8 @@ static void crashHandler(int sig)
 
     // Can't use Qt GUI from signal handler, but fprintf + abort is better than silent SIGSEGV
     fprintf(stderr, "\n*** LaraRadio crashed (signal %d) ***\n", sig);
-    fprintf(stderr, "This is likely a bug in the FFmpeg audio decoder with certain MP3 files.\n");
-    fprintf(stderr, "Try converting the problematic file or check its integrity.\n");
+    fprintf(stderr, "Unexpected fatal error — possibly a bug in LaraRadio, Qt or the media stack.\n");
+    fprintf(stderr, "If it happens again, note what was playing and report the log output above.\n");
     fflush(stderr);
 
     _exit(128 + sig);
@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     // qputenv("QT_MEDIA_BACKEND", QByteArray("gstreamer"));
     // qputenv("GST_AUDIOSINK", QByteArray("alsasink"));
 
-    // Install crash handlers for FFmpeg decoder bugs
+    // Install crash handlers so a fatal crash prints a message instead of dying silently
     signal(SIGSEGV, crashHandler);
     signal(SIGABRT, crashHandler);
     signal(SIGFPE, crashHandler);
