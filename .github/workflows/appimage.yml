@@ -114,7 +114,7 @@ jobs:
 
           mkdir -p dist
           export ARCH=x86_64
-          appimagetool-x86_64.AppImage AppDir "dist/LaraRadio-${VERSION}-x86_64.AppImage"
+          appimagetool-x86_64.AppImage AppDir "dist/SlopRadio-${VERSION}-x86_64.AppImage"
 
       - name: Smoke test the AppImage
         run: |
