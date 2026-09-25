@@ -8,6 +8,8 @@
 #include <QOpenGLBuffer>
 #include <QOpenGLFunctions>
 #include <QOpenGLContext>
+#include <QOpenGLFramebufferObject>
+#include <QOpenGLPixelTransferOptions>
 #include <QSurface>
 #include <QTimer>
 #include <QElapsedTimer>
@@ -15,6 +17,7 @@
 #include <QFile>
 #include <QImage>
 #include <QVideoSink>
+#include <QVideoFrameFormat>
 #include <QRandomGenerator>
 #include <cmath>
 #include <algorithm>
@@ -36,6 +39,71 @@ const GLfloat kQuad[16] = {
 
 const char *kDefaultFrag = ":/shaders/crossfade.frag";
 const char *kDefaultVert = ":/shaders/fullscreen.vert";
+
+// YUV → RGB converter (NV12 luma+interleaved CbCr, or YUV420P planar)
+// rendered into a per-deck RGBA FBO. The YUV planes are uploaded with the
+// first row (video top) at v = 0, matching the QImage upload convention, so
+// sampling uses flipped texcoords to keep the FBO texture in the same
+// orientation as the m_tex[] RGBA uploads.
+const char *kYuvVert = R"(
+attribute vec2 vertex;
+attribute vec2 texCoord;
+varying vec2 tex;
+void main()
+{
+    tex = texCoord;
+    gl_Position = vec4(vertex, 0.0, 1.0);
+}
+)";
+
+const char *kYuvFrag = R"(
+#ifdef GL_ES
+precision mediump float;
+#endif
+varying vec2 tex;
+uniform sampler2D uY;   // luma (R8)
+uniform sampler2D uCb;  // NV12: RG8 CbCr (Cb = .r, Cr = .g) or planar Cb
+uniform sampler2D uCr;  // planar Cr only (unused for NV12)
+uniform int uMode;      // 1 = NV12, 2 = yuv420p planar
+uniform int uMatrix;    // 0 = BT.601, 1 = BT.709
+uniform int uFull;      // 1 = full range, 0 = limited
+
+void main()
+{
+    vec2 tc = vec2(tex.x, 1.0 - tex.y);
+    float y = texture2D(uY, tc).r;
+    float cb, cr;
+    if (uMode == 1) {
+        vec2 c = texture2D(uCb, tc).rg;
+        cb = c.r;
+        cr = c.g;
+    } else {
+        cb = texture2D(uCb, tc).r;
+        cr = texture2D(uCr, tc).r;
+    }
+    float yf, cbf, crf;
+    if (uFull == 1) {
+        yf = y;
+        cbf = cb - 0.5;
+        crf = cr - 0.5;
+    } else {
+        yf = clamp((y * 255.0 - 16.0) / 219.0, 0.0, 1.0);
+        cbf = (cb * 255.0 - 128.0) / 224.0;
+        crf = (cr * 255.0 - 128.0) / 224.0;
+    }
+    float r, g, b;
+    if (uMatrix == 1) { // BT.709
+        r = yf + 1.5748 * crf;
+        g = yf - 0.1873 * cbf - 0.4681 * crf;
+        b = yf + 1.8556 * cbf;
+    } else { // BT.601
+        r = yf + 1.402 * crf;
+        g = yf - 0.344136 * cbf - 0.714136 * crf;
+        b = yf + 1.772 * cbf;
+    }
+    gl_FragColor = vec4(r, g, b, 1.0);
+}
+)";
 
 // Minimum duration of a visual transition when the outgoing deck stopped
 // instead of fading (natural EndOfMedia advances are a hard audio cut, so
@@ -272,6 +340,15 @@ void VideoMixer::paintGL()
         return;
 
     uploadFrames();
+    if (!convertYuvFrames()) {
+        // Converter shader failed to build: fall the decks back to the CPU
+        // toImage() path and force a re-upload next frame.
+        for (int i = 0; i < 2; ++i) {
+            m_yuvMode[i] = 0;
+            m_yuvDirty[i] = false;
+            m_lastFrameStart[i] = -1;
+        }
+    }
     renderScene();
 }
 
@@ -288,6 +365,20 @@ void VideoMixer::uploadFrames()
 
         m_lastFrameStart[i] = frame.startTime();
         m_latest[i] = frame;
+
+        // Fast path for hardware/planar decode: upload the YUV planes as-is
+        // and convert to RGB on the GPU. Only NV12 and YUV420P are handled
+        // (the 8-bit formats every hw decoder on this class of GPU delivers);
+        // anything else falls through to the toImage() path below.
+        if (frame.pixelFormat() == QVideoFrameFormat::Format_NV12
+            || frame.pixelFormat() == QVideoFrameFormat::Format_YUV420P) {
+            if (uploadYuvPlanes(i, frame)) {
+                m_yuvDirty[i] = true;
+                continue;
+            }
+            // map() failed → the frame is not CPU-readable; fall back.
+            m_yuvMode[i] = 0;
+        }
 
         // QVideoFrame::toImage() may make the video's own GL context current
         // and leave it that way; every texture operation below must run in
@@ -324,6 +415,263 @@ void VideoMixer::uploadFrames()
         }
         tex->setData(0, QOpenGLTexture::RGBA, QOpenGLTexture::UInt8, img.constBits());
     }
+}
+
+bool VideoMixer::uploadYuvPlanes(int deck, QVideoFrame &frame)
+{
+    const int w = frame.width();
+    const int h = frame.height();
+    if (w <= 0 || h <= 0)
+        return false;
+    if (!frame.map(QVideoFrame::ReadOnly))
+        return false;
+
+    const bool nv12 = frame.pixelFormat() == QVideoFrameFormat::Format_NV12;
+    const int n = frame.planeCount();
+    if (n < (nv12 ? 2 : 3)) {
+        frame.unmap();
+        return false;
+    }
+
+    QOpenGLFunctions *f = QOpenGLContext::currentContext()->functions();
+    const int cw = (w + 1) / 2;
+    const int ch2 = (h + 1) / 2;
+
+    const uchar *yBits = frame.bits(0);
+    if (!yBits) {
+        frame.unmap();
+        return false;
+    }
+    const int yBpl = frame.bytesPerLine(0);
+
+    // Luma (R8). Recreated whenever the resolution changes, mirroring the
+    // RGBA texture logic (QOpenGLTexture::setSize() refuses to resize once
+    // storage is allocated).
+    QOpenGLTexture *yTex = m_planeY[deck].get();
+    if (!yTex) {
+        yTex = new QOpenGLTexture(QOpenGLTexture::Target2D);
+        m_planeY[deck].reset(yTex);
+    }
+    if (yTex->width() != w || yTex->height() != h || !yTex->isStorageAllocated()) {
+        yTex->destroy();
+        yTex->setFormat(QOpenGLTexture::R8_UNorm);
+        yTex->setSize(w, h);
+        yTex->allocateStorage(QOpenGLTexture::Red, QOpenGLTexture::UInt8);
+        yTex->setWrapMode(QOpenGLTexture::DirectionS, QOpenGLTexture::ClampToEdge);
+        yTex->setWrapMode(QOpenGLTexture::DirectionT, QOpenGLTexture::ClampToEdge);
+        yTex->setMinificationFilter(QOpenGLTexture::Linear);
+        yTex->setMagnificationFilter(QOpenGLTexture::Linear);
+    }
+    {
+        QOpenGLPixelTransferOptions opts;
+        opts.setAlignment(1); // 1-byte rows; avoids GL's 4-byte padding
+        if (yBpl != w)
+            opts.setRowLength(yBpl); // R8 → 1 byte/pixel
+        yTex->setData(0, QOpenGLTexture::Red, QOpenGLTexture::UInt8, yBits, &opts);
+    }
+
+    if (nv12) {
+        // Interleaved CbCr (RG8), half resolution on both axes.
+        const uchar *uvBits = frame.bits(1);
+        if (!uvBits) {
+            frame.unmap();
+            return false;
+        }
+        const int uvBpl = frame.bytesPerLine(1);
+        QOpenGLTexture *uvTex = m_planeUV[deck].get();
+        if (!uvTex) {
+            uvTex = new QOpenGLTexture(QOpenGLTexture::Target2D);
+            m_planeUV[deck].reset(uvTex);
+        }
+        if (uvTex->width() != cw || uvTex->height() != ch2 || !uvTex->isStorageAllocated()) {
+            uvTex->destroy();
+            uvTex->setFormat(QOpenGLTexture::RG8_UNorm);
+            uvTex->setSize(cw, ch2);
+            uvTex->allocateStorage(QOpenGLTexture::RG, QOpenGLTexture::UInt8);
+            uvTex->setWrapMode(QOpenGLTexture::DirectionS, QOpenGLTexture::ClampToEdge);
+            uvTex->setWrapMode(QOpenGLTexture::DirectionT, QOpenGLTexture::ClampToEdge);
+            uvTex->setMinificationFilter(QOpenGLTexture::Linear);
+            uvTex->setMagnificationFilter(QOpenGLTexture::Linear);
+        }
+        QOpenGLPixelTransferOptions opts;
+        opts.setAlignment(1);
+        if (uvBpl != cw * 2)
+            opts.setRowLength(uvBpl / 2); // RG8 → 2 bytes/pixel
+        uvTex->setData(0, QOpenGLTexture::RG, QOpenGLTexture::UInt8, uvBits, &opts);
+    } else {
+        // Planar YUV420P: separate Cb and Cr planes (R8).
+        const uchar *uBits = frame.bits(1);
+        const uchar *vBits = frame.bits(2);
+        if (!uBits || !vBits) {
+            frame.unmap();
+            return false;
+        }
+        const int uBpl = frame.bytesPerLine(1);
+        const int vBpl = frame.bytesPerLine(2);
+        QOpenGLTexture *uTex = m_planeU[deck].get();
+        if (!uTex) {
+            uTex = new QOpenGLTexture(QOpenGLTexture::Target2D);
+            m_planeU[deck].reset(uTex);
+        }
+        if (uTex->width() != cw || uTex->height() != ch2 || !uTex->isStorageAllocated()) {
+            uTex->destroy();
+            uTex->setFormat(QOpenGLTexture::R8_UNorm);
+            uTex->setSize(cw, ch2);
+            uTex->allocateStorage(QOpenGLTexture::Red, QOpenGLTexture::UInt8);
+            uTex->setWrapMode(QOpenGLTexture::DirectionS, QOpenGLTexture::ClampToEdge);
+            uTex->setWrapMode(QOpenGLTexture::DirectionT, QOpenGLTexture::ClampToEdge);
+            uTex->setMinificationFilter(QOpenGLTexture::Linear);
+            uTex->setMagnificationFilter(QOpenGLTexture::Linear);
+        }
+        QOpenGLTexture *vTex = m_planeV[deck].get();
+        if (!vTex) {
+            vTex = new QOpenGLTexture(QOpenGLTexture::Target2D);
+            m_planeV[deck].reset(vTex);
+        }
+        if (vTex->width() != cw || vTex->height() != ch2 || !vTex->isStorageAllocated()) {
+            vTex->destroy();
+            vTex->setFormat(QOpenGLTexture::R8_UNorm);
+            vTex->setSize(cw, ch2);
+            vTex->allocateStorage(QOpenGLTexture::Red, QOpenGLTexture::UInt8);
+            vTex->setWrapMode(QOpenGLTexture::DirectionS, QOpenGLTexture::ClampToEdge);
+            vTex->setWrapMode(QOpenGLTexture::DirectionT, QOpenGLTexture::ClampToEdge);
+            vTex->setMinificationFilter(QOpenGLTexture::Linear);
+            vTex->setMagnificationFilter(QOpenGLTexture::Linear);
+        }
+        {
+            QOpenGLPixelTransferOptions opts;
+            opts.setAlignment(1);
+            if (uBpl != cw)
+                opts.setRowLength(uBpl);
+            uTex->setData(0, QOpenGLTexture::Red, QOpenGLTexture::UInt8, uBits, &opts);
+        }
+        {
+            QOpenGLPixelTransferOptions opts;
+            opts.setAlignment(1);
+            if (vBpl != cw)
+                opts.setRowLength(vBpl);
+            vTex->setData(0, QOpenGLTexture::Red, QOpenGLTexture::UInt8, vBits, &opts);
+        }
+    }
+
+    frame.unmap();
+
+    // Undo the unpack state the uploads may have changed.
+    f->glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    f->glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+
+    const QVideoFrameFormat fmt = frame.surfaceFormat();
+    m_yuvMatrix[deck] =
+        (fmt.colorSpace() == QVideoFrameFormat::ColorSpace_BT709) ? 1 : 0;
+    if (fmt.colorSpace() == QVideoFrameFormat::ColorSpace_Undefined)
+        m_yuvMatrix[deck] = (h > 576) ? 1 : 0; // heuristic: ≥720p ⇒ HDTV
+    m_yuvFull[deck] =
+        (fmt.colorRange() == QVideoFrameFormat::ColorRange_Full) ? 1 : 0;
+    m_yuvMode[deck] = nv12 ? 1 : 2;
+    m_yuvSize[deck] = QSize(w, h);
+    return true;
+}
+
+bool VideoMixer::ensureYuvProgram()
+{
+    if (m_yuvProgram)
+        return true;
+    auto program = std::make_unique<QOpenGLShaderProgram>();
+    program->bindAttributeLocation("vertex", 0);
+    program->bindAttributeLocation("texCoord", 1);
+    if (!program->addShaderFromSourceCode(QOpenGLShader::Vertex, QLatin1String(kYuvVert)))
+        return false;
+    if (!program->addShaderFromSourceCode(QOpenGLShader::Fragment, QLatin1String(kYuvFrag)))
+        return false;
+    if (!program->link())
+        return false;
+    m_yuvProgram = std::move(program);
+    return true;
+}
+
+bool VideoMixer::convertYuvFrames()
+{
+    bool any = false;
+    for (int i = 0; i < 2; ++i)
+        if (m_yuvMode[i] != 0 && m_yuvDirty[i])
+            any = true;
+    if (!any)
+        return true;
+    if (!ensureYuvProgram())
+        return false;
+
+    QOpenGLFunctions *f = QOpenGLContext::currentContext()->functions();
+    m_yuvProgram->bind();
+    m_yuvProgram->setUniformValue(m_yuvProgram->uniformLocation("uY"), 2);
+    m_yuvProgram->setUniformValue(m_yuvProgram->uniformLocation("uCb"), 3);
+    m_yuvProgram->setUniformValue(m_yuvProgram->uniformLocation("uCr"), 4);
+
+    for (int i = 0; i < 2; ++i) {
+        if (m_yuvMode[i] == 0 || !m_yuvDirty[i])
+            continue;
+        const QSize vs = m_yuvSize[i];
+        if (vs.isEmpty())
+            continue;
+        if (!m_yuvProgram)
+            break;
+
+        if (!m_fbo[i] || m_fbo[i]->size() != vs)
+            m_fbo[i] = std::make_unique<QOpenGLFramebufferObject>(vs);
+        if (!m_fbo[i]->isValid())
+            continue;
+
+        m_fbo[i]->bind();
+        f->glViewport(0, 0, vs.width(), vs.height());
+
+        f->glActiveTexture(GL_TEXTURE2);
+        m_planeY[i]->bind();
+        const int mode = m_yuvMode[i];
+        if (mode == 1) {
+            f->glActiveTexture(GL_TEXTURE3);
+            m_planeUV[i]->bind();
+        } else {
+            f->glActiveTexture(GL_TEXTURE3);
+            m_planeU[i]->bind();
+            f->glActiveTexture(GL_TEXTURE4);
+            m_planeV[i]->bind();
+        }
+        m_yuvProgram->setUniformValue("uMode", mode);
+        m_yuvProgram->setUniformValue("uMatrix", m_yuvMatrix[i]);
+        m_yuvProgram->setUniformValue("uFull", m_yuvFull[i]);
+
+        if (m_vao && m_vao->isCreated()) {
+            m_vao->bind();
+            f->glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            m_vao->release();
+        } else {
+            m_vbo->bind();
+            f->glEnableVertexAttribArray(0);
+            f->glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat),
+                                     reinterpret_cast<const void *>(0));
+            f->glEnableVertexAttribArray(1);
+            f->glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat),
+                                     reinterpret_cast<const void *>(2 * sizeof(GLfloat)));
+            f->glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        }
+
+        m_fbo[i]->release();
+        m_yuvDirty[i] = false;
+    }
+
+    m_yuvProgram->release();
+    // QOpenGLFramebufferObject::bind() leaves the FBO bound; restore the
+    // widget's draw target so renderScene() renders to the screen.
+    f->glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
+    return true;
+}
+
+GLuint VideoMixer::sceneTextureId(int deck) const
+{
+    if (m_yuvMode[deck] != 0 && m_fbo[deck] && m_fbo[deck]->isValid())
+        return m_fbo[deck]->texture();
+    if (m_tex[deck])
+        return m_tex[deck]->textureId();
+    return 0;
 }
 
 bool VideoMixer::ensureProgram()
@@ -504,11 +852,16 @@ void VideoMixer::renderScene()
     // has already stopped — otherwise the old video vanishes at EndOfMedia
     // and the effect appears to start from black.
     const bool fromHeld = m_inTransition && m_lastFrameStart[from] >= 0;
-    QOpenGLTexture *fromTex =
-        (fromActive || fromHeld) ? m_tex[from].get() : m_blackTex.get();
-    QOpenGLTexture *toTex = toActive ? m_tex[to].get() : m_blackTex.get();
-    fromTex->bind(0);
-    toTex->bind(1);
+    GLuint fromId = (fromActive || fromHeld) ? sceneTextureId(from) : 0;
+    GLuint toId = toActive ? sceneTextureId(to) : 0;
+    if (!fromId)
+        fromId = m_blackTex->textureId();
+    if (!toId)
+        toId = m_blackTex->textureId();
+    f->glActiveTexture(GL_TEXTURE0);
+    f->glBindTexture(GL_TEXTURE_2D, fromId);
+    f->glActiveTexture(GL_TEXTURE1);
+    f->glBindTexture(GL_TEXTURE_2D, toId);
 
     if (m_vao && m_vao->isCreated()) {
         m_vao->bind();

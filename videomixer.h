@@ -14,6 +14,7 @@ class QOpenGLShaderProgram;
 class QOpenGLTexture;
 class QOpenGLVertexArrayObject;
 class QOpenGLBuffer;
+class QOpenGLFramebufferObject;
 class QTimer;
 class QElapsedTimer;
 
@@ -84,6 +85,15 @@ private:
     bool effectExists(const QString &id) const;
     QString readSource(const QString &path) const;
 
+    // Hardware/planar decode fast path. Frames delivered as NV12 or YUV420P
+    // (e.g. VA-API / CUDA hw decode) are uploaded plane-by-plane and converted
+    // to RGB on the GPU instead of going through QVideoFrame::toImage() on the
+    // CPU.
+    bool uploadYuvPlanes(int deck, QVideoFrame &frame);
+    bool convertYuvFrames();
+    bool ensureYuvProgram();
+    GLuint sceneTextureId(int deck) const;
+
     AudioPlayer *m_decks[2] = {nullptr, nullptr};
     int m_incoming = 1;
 
@@ -92,6 +102,20 @@ private:
     std::unique_ptr<QOpenGLTexture> m_blackTex;
     std::unique_ptr<QOpenGLVertexArrayObject> m_vao;
     std::unique_ptr<QOpenGLBuffer> m_vbo;
+
+    // YUV decode path: per-deck luma/chroma plane textures, the RGB output
+    // FBO (one per deck, at video resolution) and the converter program.
+    std::unique_ptr<QOpenGLTexture> m_planeY[2];   // R8  luma, full size
+    std::unique_ptr<QOpenGLTexture> m_planeUV[2];  // RG8 NV12 interleaved CbCr
+    std::unique_ptr<QOpenGLTexture> m_planeU[2];   // R8  planar Cb
+    std::unique_ptr<QOpenGLTexture> m_planeV[2];   // R8  planar Cr
+    std::unique_ptr<QOpenGLFramebufferObject> m_fbo[2];
+    std::unique_ptr<QOpenGLShaderProgram> m_yuvProgram;
+    QSize m_yuvSize[2];            // video size of the last uploaded yuv frame
+    int m_yuvMode[2] = {0, 0};     // 0 = RGB path, 1 = NV12, 2 = planar
+    int m_yuvMatrix[2] = {0, 0};   // 0 = BT.601, 1 = BT.709
+    int m_yuvFull[2] = {0, 0};     // 0 = limited range, 1 = full range
+    bool m_yuvDirty[2] = {false, false};
 
     QList<Effect> m_effects;
     QString m_currentEffect;
