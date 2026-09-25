@@ -1,106 +1,70 @@
-# LaraRadio
-
-[🇧🇷 Português](README.pt-BR.md) | [🇪🇸 Español](README.es.md)
-
-LaraRadio is a lightweight and efficient radio automation software designed for Linux systems.
-It focuses on simplicity, performance, and reliability for small to medium radio stations.
+# SlopRadio
+SlopRadio is an enhanced fork of [gutierre69/lararadio](https://github.com/gutierre69/lararadio) that leans heavily on LLM-generated code — hence the "slop" in the name.
+> See [What's new vs the original](#whats-new-vs-the-original) for what this fork adds on top.
 
 ---
 
-## Overview
-
-LaraRadio was designed with a pragmatic engineering mindset:
-
-- Minimal CPU and RAM footprint
-- Native Linux execution (no heavy runtimes)
-- Deterministic audio playback
-- Modular and extensible architecture
-
----
-
-## Tech Stack
-
-### C++
-The core is implemented in modern C++, providing:
-
-- High performance and low latency
-- Fine-grained control over memory and threads
-- Predictable real-time behavior
-
-### Qt 6
-Qt is used for the GUI layer:
-
-- Event-driven architecture
-- Clean separation between UI and logic
-- Cross-platform potential (future)
-
-### FFmpeg
-Handles decoding and playback:
-
-- Wide format support (MP3, AAC, OGG, etc.)
-- Mature and battle-tested
-- Streaming-ready
-
----
-
-## Build Instructions
+## Install
 
 ### Requirements
 
-- GCC 11+ or Clang
-- CMake 3.16+
-- Qt 6.8+ (Quick, Widgets, Multimedia, MultimediaWidgets)
-- TagLib
-- FFmpeg runtime support for Qt Multimedia
+- x86_64 Linux — the AppImage is built on Ubuntu 22.04 and runs on Ubuntu 22.04+, Debian 12+ and similar distros.
+- `ffmpeg` in `PATH` is **recommended**: it lets SlopRadio transcode MP3 files with embedded album art on the fly (avoids a decoder crash). Playback works without it — such files simply fall back to playing the original.
 
-### Ubuntu example
+### Download & run
 
-```bash
-sudo apt update
-sudo apt install build-essential cmake ninja-build qt6-base-dev qt6-declarative-dev qt6-multimedia-dev libtag1-dev ffmpeg
-```
+The AppImage is rebuilt automatically on every push to `main` and published as a *continuous* pre-release:
 
-If your Ubuntu release does not provide Qt 6.8 or newer, install Qt from the official Qt installer and make sure CMake can find that Qt installation.
-
-### Build
+**[⬇ Download the latest AppImage](https://github.com/luizfern12/slopradio/releases/tag/continuous)**
 
 ```bash
-git clone https://github.com/gutierre69/lararadio.git
-cd lararadio
-
-mkdir build
-cd build
-
-cmake ..
-cmake --build . -j$(nproc)
-```
-
-### Run
-
-```bash
-./appLaraRadio
+chmod +x LaraRadio-1.1.0-x86_64.AppImage
+./LaraRadio-1.1.0-x86_64.AppImage
 ```
 
 ---
 
-## Distribution
+## What's new vs the original
 
-- AppImage (primary)
-- Flatpak (planned)
+The original LaraRadio kept the station on air with a solid core: playlist automation, jingles, time announcements, VU meters and clock. This fork keeps all of that and adds:
+
+### 🎬 Video output with crossfade transitions
+Tracks with video play in a dedicated video window, and the same crossfade used for audio blends the video between tracks (OpenGL mixer, shader transitions supported). Video decoding can be hardware-accelerated — Auto / VA-API / CUDA / Off, chosen in **Settings → Video** — which keeps weak CPUs from dropping frames.
+
+### 🚀 Faster startup, modern look
+- Splash screen removed — the main window appears as soon as initialization finishes (≈ 2 s faster).
+- The main window is freely resizable and keeps its proportions at any size.
+
+### 🛡️ Stability the original didn't have
+- **Crash handler** — fatal errors print a diagnostic message instead of dying silently.
+- **Error auto-skip** — a failed track is skipped automatically instead of stalling the rotation.
+- **Silence watchdog** — if a track "plays" but no audio reaches the meters for 10 s, it is skipped.
+- **MP3 album-art transcoding** — avoids the `mp3float` crash after several songs with cover art.
+- Fixed: segfaults when editing the playlist mid-playback, double-advance races on short jingles, and a Stop button that didn't stop with an empty playlist.
+
+### 🎧 Studio workflow
+- **Pre-cue** — right-click any playlist row to open a cue window with its own transport (seek, play/pause/stop) and **headphone volume**, routed to a separate output device.
+- **Output device selection** — pick the main output *and* a dedicated cue/headphones device (**Settings → Saídas**), hot-plug aware.
+- **Playlist improvements** — drag & drop from the file manager (files or whole folders), multi-select with `Ctrl`/`Shift` + `Del` to remove, and playback pointers that survive row removals.
+
+### 🛠️ Settings
+The settings dialog was reorganized into tabs — Fade, Caminhos (paths), Saídas (outputs), Comportamento (behavior) — plus the new Video tab.
 
 ---
 
-## Contributing
+## Build from source
 
-We welcome contributions:
+Requirements: Qt 6.8+, CMake 3.16+, a C++ compiler and TagLib.
 
-- Bug fixes
-- Performance improvements
-- UI/UX enhancements
-- New features
+```bash
+./build.sh          # compiles translations, configures and builds
+./build/appLaraRadio
+```
 
 ---
 
-## Website
+## Resources
 
-https://lararadio.com
+- Full change log: [`CHANGELOG.md`](CHANGELOG.md)
+
+---
