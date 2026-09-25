@@ -23,7 +23,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>LaraRadio</string>
+   <string>SlopRadio</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QTreeView" name="files">
