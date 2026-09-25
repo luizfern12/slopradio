@@ -145,6 +145,11 @@ Fork: https://github.com/brdelphus/lararadio
   previously commented out). Dark background `#303030`, base `#242424`,
   text `#dcdcdc`, highlight `#55aaff`. Falls back to GTK3 theme when
   available.
+- **Splash screen removed**: startup no longer waits on the splash's
+  fixed 2-second delay (`QSplashScreen` + "simulate work" timer). The
+  main window is shown as soon as initialization finishes — faster
+  startup (≈2 s saved). The `splash-*.png` assets were removed from
+  `resources.qrc`.
 
 #### `mainwindow.h` / `mainwindow.cpp`
 - **`skipToNext()`**: public slot — resets both players, advances

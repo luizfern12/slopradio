@@ -41,8 +41,6 @@
         <file>languages/pt_BR.qm</file>
         <file>images/icons/language.png</file>
         <file>images/penguin_logo.png</file>
-        <file>images/splash-01.png</file>
-        <file>images/splash-02.png</file>
         <file>images/brazil-brand.png</file>
         <file>shaders/fullscreen.vert</file>
         <file>shaders/crossfade.frag</file>

@@ -151,6 +151,11 @@ Fork: https://github.com/brdelphus/lararadio
 - **Tema escuro**: ativada a palette do tema escuro Fusion (estava
   comentada). Fundo `#303030`, base `#242424`, texto `#dcdcdc`,
   destaque `#55aaff`. Usa GTK3 quando disponível.
+- **Splash screen removido**: o aplicativo não espera mais pelo atraso
+  fixo de 2 segundos do splash (`QSplashScreen` + timer de "simular
+  trabalho"). A janela principal aparece assim que a inicialização
+  termina — inicialização mais rápida (≈2 s economizados). Os assets
+  `splash-*.png` foram removidos do `resources.qrc`.
 
 #### `mainwindow.h` / `mainwindow.cpp`
 - **`skipToNext()`**: slot público — reseta ambos players, avança

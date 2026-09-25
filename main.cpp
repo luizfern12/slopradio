@@ -4,8 +4,6 @@
 #include <QStyleFactory>
 #include <QPalette>
 #include <QTranslator>
-#include <QSplashScreen>
-#include <QTimer>
 #include <QObject>
 #include <QSharedMemory>
 #include <QScreen>
@@ -78,11 +76,6 @@ int main(int argc, char *argv[])
 
     MainWindow w;
 
-    QPixmap pixmap(":/images/splash-02.png");
-    QPixmap pixmapForSplash = pixmap.scaled(500, 300);
-    QSplashScreen splash(pixmapForSplash);
-
-
     QStringList styles = QStyleFactory::keys();
 
     if (styles.contains("gtk3", Qt::CaseInsensitive)) {
@@ -122,18 +115,7 @@ int main(int argc, char *argv[])
         a.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }");
     }
 
-    splash.show();
-    a.processEvents();
-
-    // Simulate some work
-    QTimer timer;
-    timer.setSingleShot(true);
-    QObject::connect(&timer, &QTimer::timeout, [&]() {
-        splash.finish(&w);
-        splash.close();
-        w.show();
-    });
-    timer.start(2000);
+    w.show();
 
     return a.exec();
 }
