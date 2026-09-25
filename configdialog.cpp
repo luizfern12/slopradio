@@ -3,6 +3,8 @@
 #include "videomixer.h"
 #include <QMediaDevices>
 #include <QAudioDevice>
+#include <QProcess>
+#include <QMessageBox>
 
 ConfigDialog::ConfigDialog(QWidget *parent)
     : QDialog(parent)
@@ -39,6 +41,17 @@ ConfigDialog::ConfigDialog(QWidget *parent)
     const int idx = ui->video_transition->findData(wantedEffect);
     ui->video_transition->setCurrentIndex(idx >= 0 ? idx : 0);
 
+    // video tab: hardware decode backend (Qt FFmpeg). "auto" leaves the env
+    // var unset (Qt picks the first working backend); an empty value would
+    // disable HW decode, so the empty string is never used.
+    ui->video_hwdecode->addItem(tr("Automático (recomendado)"), QStringLiteral("auto"));
+    ui->video_hwdecode->addItem(tr("VA-API — AMD e Intel"), QStringLiteral("vaapi"));
+    ui->video_hwdecode->addItem(tr("CUDA — NVIDIA"), QStringLiteral("cuda"));
+    ui->video_hwdecode->addItem(tr("Desligada (CPU)"), QStringLiteral("off"));
+    const QString hwMode = settings.value("video/hwdecode", QStringLiteral("auto")).toString();
+    const int hidx = ui->video_hwdecode->findData(hwMode);
+    ui->video_hwdecode->setCurrentIndex(hidx >= 0 ? hidx : 0);
+
     populateOutputDevices( settings.value("audio/outputDevice").toByteArray(),
                            settings.value("audio/cueDevice").toByteArray() );
 
@@ -73,6 +86,7 @@ void ConfigDialog::accept()
     settings.setValue("audio/cueDevice", ui->cue_device->currentData().toByteArray());
     settings.setValue("video/transition", ui->video_transition->currentData().toString());
     settings.setValue("video/shaderDir", ui->video_shaderDir->text());
+    settings.setValue("video/hwdecode", ui->video_hwdecode->currentData().toString());
 
     this->close();
 }
@@ -110,6 +124,36 @@ void ConfigDialog::on_btn_searchShaderDir_clicked()
     if (!dir.isEmpty()) {
         ui->video_shaderDir->setText(dir);
     }
+}
+
+void ConfigDialog::on_btn_checkVAAPI_clicked()
+{
+    QProcess proc;
+    proc.start(QStringLiteral("vainfo"), QStringList());
+    if (!proc.waitForStarted(3000)) {
+        QMessageBox::information(this, tr("VA-API"),
+            tr("O comando 'vainfo' não foi encontrado.\n"
+               "Instale o pacote libva-utils (ou equivalente).\n\n"
+               "Usuários NVIDIA podem obter suporte VA-API via nvidia-vaapi-driver\n"
+               "(ou simplesmente escolher CUDA — nesse caso é normal não haver VA-API)."));
+        return;
+    }
+    if (!proc.waitForFinished(5000)) {
+        proc.kill();
+        QMessageBox::warning(this, tr("VA-API"),
+                             tr("'vainfo' não respondeu (timeout de 5 segundos)."));
+        return;
+    }
+    const QString out =
+        QString::fromLocal8Bit(proc.readAllStandardOutput() + "\n"
+                               + proc.readAllStandardError())
+            .trimmed();
+    QMessageBox box(this);
+    box.setWindowTitle(tr("VA-API"));
+    box.setText(tr("'vainfo' terminou com código %1.").arg(proc.exitCode())
+                + (out.isEmpty() ? tr("\n(sem saída)") : QString()));
+    box.setDetailedText(out);
+    box.exec();
 }
 
 void ConfigDialog::populateOutputDevices(const QByteArray &selectId, const QByteArray &selectCueId)

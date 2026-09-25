@@ -10,6 +10,7 @@
 #include <QSharedMemory>
 #include <QScreen>
 #include <QMessageBox>
+#include <QSettings>
 #include <csignal>
 #include <cstdlib>
 
@@ -57,6 +58,19 @@ int main(int argc, char *argv[])
 
     QCoreApplication::setOrganizationName("LaraRadio");
     QCoreApplication::setApplicationName("LaraRadio");
+
+    // Video hardware decode backend (Qt FFmpeg) — applied now, before any
+    // QMediaPlayer exists. "auto" leaves the env var UNSET (Qt picks the first
+    // working backend); note that setting it to an empty string would actually
+    // DISABLE hw decode, so we only ever set it for the explicit modes.
+    QSettings hwSettings;
+    const QString hwMode = hwSettings.value("video/hwdecode", QStringLiteral("auto")).toString();
+    if (hwMode == QLatin1String("vaapi"))
+        qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", QByteArray("vaapi"));
+    else if (hwMode == QLatin1String("cuda"))
+        qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", QByteArray("cuda"));
+    else if (hwMode == QLatin1String("off"))
+        qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", QByteArray(","));
 
     // QTranslator translator;
     // translator.load(":/languages/en_US.qm");
