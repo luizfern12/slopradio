@@ -306,6 +306,15 @@ void VideoMixer::uploadFrames()
         QOpenGLTexture *tex = m_tex[i].get();
         if (tex->width() != img.width() || tex->height() != img.height()
             || !tex->isStorageAllocated()) {
+            // QOpenGLTexture::setSize() refuses to change dimensions once
+            // storage is allocated (it warns and returns), which left the
+            // texture at the previous track's resolution: setData() then
+            // over-read the smaller QImage (crash) or drew stale strips
+            // (corruption) whenever a video's resolution differed from the
+            // last one. Destroy and recreate instead. destroy() also resets
+            // format, wrap and filters, so every one is re-applied below.
+            tex->destroy();
+            tex->setFormat(QOpenGLTexture::RGBA8_UNorm);
             tex->setSize(img.width(), img.height());
             tex->allocateStorage(QOpenGLTexture::RGBA, QOpenGLTexture::UInt8);
             tex->setWrapMode(QOpenGLTexture::DirectionS, QOpenGLTexture::ClampToEdge);
