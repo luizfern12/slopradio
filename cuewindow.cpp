@@ -25,6 +25,7 @@ CueWindow::~CueWindow()
 
 void CueWindow::loadAndPlay(const QString &path, const QString &displayName)
 {
+    m_seeking = false;
     m_player.Stop();
     m_player.addMedia(path);
 
@@ -69,15 +70,27 @@ void CueWindow::on_btn_play_clicked()
 
 void CueWindow::on_btn_stop_clicked()
 {
+    m_seeking = false;
     m_player.Stop();
     m_player.Seek(0);
     refreshTime();
     updateTransportIcon();
 }
 
+void CueWindow::on_seeker_sliderPressed()
+{
+    m_seeking = true;
+}
+
 void CueWindow::on_seeker_sliderReleased()
 {
+    m_seeking = false;
     m_player.Seek(ui->seeker->value());
+
+    // show the requested position right away: the seek is async, so
+    // updatePosition() would otherwise pull the bar back to the old
+    // spot until the player actually lands on the new one
+    updateTimeLabel(ui->seeker->value(), m_player.getDuration());
 }
 
 void CueWindow::on_cue_volume_valueChanged(int value)
@@ -89,19 +102,26 @@ void CueWindow::updatePosition(qint64 position)
 {
     const qint64 total = m_player.getDuration();
 
-    ui->seeker->setMaximum(total > 0 ? (int)total : 0);
-    ui->seeker->setValue((int)position);
+    // only touch the range when it actually changed: setMaximum() clamps
+    // the current value, so doing it on every tick fights the drag too
+    if (total > 0 && ui->seeker->maximum() != (int)total)
+        ui->seeker->setMaximum((int)total);
 
-    auto format = [](qint64 ms) {
-        const qint64 seconds = (ms / 1000) % 60;
-        const qint64 minutes = (ms / 1000) / 60;
-        return QString("%1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0'));
-    };
-    ui->timeLabel->setText(format(position) + " / " + format(total));
+    // While the seeker is being dragged the user owns the bar. Writing the
+    // player's position back into it would yank the handle to the old spot
+    // mid-drag, so sliderReleased() would seek to where playback already
+    // was -- the bar would track the mouse but the audio never moved.
+    if (m_seeking) {
+        updateTimeLabel(ui->seeker->value(), total);
+    } else {
+        ui->seeker->setValue((int)position);
+        updateTimeLabel(position, total);
+    }
 }
 
 void CueWindow::onPlaybackFinished()
 {
+    m_seeking = false;
     m_player.Seek(0);
     refreshTime();
     updateTransportIcon();
@@ -120,6 +140,16 @@ void CueWindow::applyVolume(int percent)
 void CueWindow::refreshTime()
 {
     updatePosition(m_player.getPosition());
+}
+
+void CueWindow::updateTimeLabel(qint64 position, qint64 total)
+{
+    auto format = [](qint64 ms) {
+        const qint64 seconds = (ms / 1000) % 60;
+        const qint64 minutes = (ms / 1000) / 60;
+        return QString("%1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0'));
+    };
+    ui->timeLabel->setText(format(position) + " / " + format(total));
 }
 
 void CueWindow::updateTransportIcon()

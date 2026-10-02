@@ -26,6 +26,7 @@ protected:
 private slots:
     void on_btn_play_clicked();
     void on_btn_stop_clicked();
+    void on_seeker_sliderPressed();
     void on_seeker_sliderReleased();
     void on_cue_volume_valueChanged(int value);
     void updatePosition(qint64 position);
@@ -34,10 +35,15 @@ private slots:
 private:
     void applyVolume(int percent);
     void refreshTime();
+    void updateTimeLabel(qint64 position, qint64 total);
     void updateTransportIcon();
 
     Ui::CueWindow *ui;
     AudioPlayer m_player;
+
+    // true while the user is dragging the seeker: the slider is then the
+    // source of truth and the position feed must not write over it
+    bool m_seeking = false;
 };
 
 #endif // CUEWINDOW_H
