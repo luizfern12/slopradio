@@ -34,6 +34,14 @@ AudioPlayer::AudioPlayer()
 
     connect(player, &QMediaPlayer::positionChanged, this, &AudioPlayer::positionChanged);
     connect(player, &QMediaPlayer::errorOccurred, this, &AudioPlayer::onPlayerError);
+
+    // A pending play request only lasts until playback really begins. Once we
+    // see a live state the player is no longer "loading", so fade() goes back
+    // to treating it as a normal player.
+    connect(player, &QMediaPlayer::playbackStateChanged, this, [this](QMediaPlayer::PlaybackState state) {
+        if (state == QMediaPlayer::PlayingState || state == QMediaPlayer::PausedState)
+            m_playRequested = false;
+    });
     connect(player, &QMediaPlayer::mediaStatusChanged, this, [=](QMediaPlayer::MediaStatus status) {
         if (status == QMediaPlayer::EndOfMedia)
             emit playbackFinished();
@@ -74,13 +82,17 @@ void AudioPlayer::Reset()
     maxVolume = 1.0f;
     current_length = 0;
     m_hasError = false;
+    m_playRequested = false;
     m_lastVideoFrameMs = -1;
 }
 
 void AudioPlayer::Play()
 {
-    if (!cleanFilePath.isEmpty())
+    if (!cleanFilePath.isEmpty()) {
+        // stays set until playbackStateChanged reports a live state
+        m_playRequested = true;
         player->play();
+    }
 }
 
 void AudioPlayer::Pause()
@@ -90,6 +102,7 @@ void AudioPlayer::Pause()
 
 void AudioPlayer::Stop()
 {
+    m_playRequested = false;
     player->stop();
 }
 
@@ -135,6 +148,7 @@ void AudioPlayer::positionChanged(qint64 position)
 void AudioPlayer::onPlayerError(QMediaPlayer::Error error, const QString &errorString)
 {
     m_hasError = true;
+    m_playRequested = false;
     qWarning() << "AudioPlayer error:" << error << errorString;
     emit mediaError(player->source().toLocalFile(), errorString);
 }
@@ -170,7 +184,13 @@ void AudioPlayer::fade()
     if(_fadeOut && getVolume()<=0 && isPlaying()) { Stop(); _fadeOut = false; isFading = false; }
     if(getVolume()>=maxVolume && isPlaying()) { _fadeIn = false; isFading = false; }
 
-    if(getVolume()>0 && isStopped()) { _fadeIn = false; _fadeIn = true; isFading = false; maxVolume = 0; setVolume(0); }
+    // Idle players are drained so a stopped deck can't bleed into the next
+    // crossfade. A player that is merely LOADING also reports StoppedState,
+    // and draining that one used to pin it silent for the whole track: the
+    // fade-in branch needs getVolume()<maxVolume, and both were just set to 0.
+    // The pre-cue player hit this every time, because it plays sources that
+    // were never loaded before (cold cache), so load outlasted the 500ms tick.
+    if(getVolume()>0 && isStopped() && !m_playRequested) { _fadeIn = false; _fadeIn = true; isFading = false; maxVolume = 0; setVolume(0); }
 }
 
 void AudioPlayer::setBuffer(QAudioBufferOutput *output)

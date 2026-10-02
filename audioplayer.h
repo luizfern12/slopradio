@@ -68,6 +68,11 @@ class AudioPlayer: public QObject
         QString cleanFilePath;
         bool m_hasError = false;
 
+        // true from Play() until playback actually starts. Loading a source
+        // is asynchronous, so right after play() the player is still in
+        // StoppedState; fade() must not mistake that for an idle player.
+        bool m_playRequested = false;
+
         QString transcodeIfNeeded(const QString &file);
 };
 
