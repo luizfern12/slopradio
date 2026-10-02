@@ -36,7 +36,24 @@ void ButtonHole::setPositon(int newX, int newY)
 void ButtonHole::setBtnText(QString newText)
 {
     text = newText;
+    // the settings key is derived from the label
+    invalidateAssignedPath();
     button->setText( text );
+}
+
+QString ButtonHole::assignedPath() const
+{
+    if (!m_assignedPathValid) {
+        m_assignedPath = settings->value("buttonhole/btn_" + text).toString();
+        m_assignedPathValid = true;
+    }
+    return m_assignedPath;
+}
+
+void ButtonHole::invalidateAssignedPath()
+{
+    m_assignedPathValid = false;
+    m_assignedPath.clear();
 }
 
 void ButtonHole::setAudioDevice(const QAudioDevice &device)
@@ -64,12 +81,14 @@ void ButtonHole::bntContextMenu(QPoint pos)
 
         if (!filename.isEmpty()) {
             settings->setValue("buttonhole/btn_"+text, filename);
+            invalidateAssignedPath();
             button->setStyleSheet("background-color: #fc0; color: #000;");
         }
     });
 
     connect(deleteAudio, &QAction::triggered, this, [=]() {
         settings->setValue("buttonhole/btn_"+text, "");
+        invalidateAssignedPath();
         button->setStyleSheet("");
     });
 
@@ -85,7 +104,7 @@ void ButtonHole::bntContextMenu(QPoint pos)
 void ButtonHole::buttonHoleClick()
 {
     // /home/gutierre69/Documentos/Studio/EFEITOS/Brasil_sil_sil.mp3
-    filename = settings->value("buttonhole/btn_"+text).toString();
+    filename = assignedPath();
     if(filename=="")
         return;
 
@@ -115,7 +134,16 @@ void ButtonHole::flash()
         return;
     }
 
-    if(settings->value("buttonhole/btn_"+text).toString()!="") button->setStyleSheet("background-color: #fc0; color: #000;");
+    // Only touch the stylesheet when the result actually differs. Calling
+    // setStyleSheet() re-parses the rule set and repolishes the widget, so
+    // doing it unconditionally made all 10 buttons repaint every 300 ms
+    // just to write the same string back.
+    const QString style =
+        !assignedPath().isEmpty()
+            ? QStringLiteral("background-color: #fc0; color: #000;")
+            : QString();
+    if (button->styleSheet() != style)
+        button->setStyleSheet(style);
 }
 
 void ButtonHole::keyPressEvent(QKeyEvent *event){

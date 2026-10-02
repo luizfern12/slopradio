@@ -30,6 +30,7 @@
 #include <QResizeEvent>
 #include <QHash>
 #include <QTranslator>
+#include <QElapsedTimer>
 #include <QPainter>
 #include <QPaintEvent>
 #include "version.h"
@@ -182,7 +183,9 @@ private:
     bool m_uiReady = false;
     bool m_recentPlaylistLoaded = false;
     QTimer *m_displayTimer = nullptr;
-    int m_silenceMs = 0;
+    // Silence watchdog measures real elapsed time, so it no longer depends
+    // on the display timer's interval.
+    QElapsedTimer m_silenceTimer;
     QSize m_designSize;
     QHash<QWidget*, QRect> m_designGeometry;
 };

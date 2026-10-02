@@ -393,7 +393,13 @@ void MainWindow::init()
 
     m_uiReady = true;
     if (m_displayTimer) {
-        m_displayTimer->start(10);
+        // 30 fps. updateDisplay() used to run at 100 Hz, which forced the
+        // VU meters to repaint 200 times a second even when idle, since
+        // VuMeter::setLevel() calls update() unconditionally. Nothing here
+        // needs 100 Hz: the meters are 33 discrete LEDs and the silence
+        // watchdog below now measures real elapsed time, so lowering the
+        // rate does not shorten the timeout.
+        m_displayTimer->start(33);
     }
 }
 
@@ -1233,7 +1239,7 @@ void MainWindow::updateDisplay() {
     // If a player reports PlayingState but no audio reaches the VU meter
     // for SILENCE_TIMEOUT ms, treat it as a failure and skip the track.
     if (isPlaying) {
-        const int SILENCE_TIMEOUT = 10000; // 10 seconds
+        const qint64 SILENCE_TIMEOUT = 10000; // 10 seconds
         bool vuActive = (currentVU_L > 0 || currentVU_R > 0);
 
         // A running video counts as "alive" even when it has no audio track,
@@ -1241,18 +1247,24 @@ void MainWindow::updateDisplay() {
         bool videoActive = audioplayer1.isVideoActive() || audioplayer2.isVideoActive();
 
         if (!audioplayer1.isFading && !audioplayer2.isFading && !vuActive && !videoActive) {
-            m_silenceMs += 10; // displayTimer interval
-            if (m_silenceMs >= SILENCE_TIMEOUT) {
-                qWarning() << "Silence watchdog: no audio for" << SILENCE_TIMEOUT
+            // Timed off the wall clock rather than by counting ticks: the
+            // accumulator version was tied to the display timer's interval,
+            // so capping the timer at 30 fps would have fired the 10 s
+            // timeout after ~3.3 s and skipped tracks constantly.
+            if (!m_silenceTimer.isValid())
+                m_silenceTimer.start();
+            const qint64 silentFor = m_silenceTimer.elapsed();
+            if (silentFor >= SILENCE_TIMEOUT) {
+                qWarning() << "Silence watchdog: no audio for" << silentFor
                            << "ms — skipping track";
-                m_silenceMs = 0;
+                m_silenceTimer.invalidate();
                 skipToNext();
             }
         } else {
-            m_silenceMs = 0;
+            m_silenceTimer.invalidate();
         }
     } else {
-        m_silenceMs = 0;
+        m_silenceTimer.invalidate();
     }
 }
 
