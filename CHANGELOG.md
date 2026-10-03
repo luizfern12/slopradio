@@ -106,6 +106,16 @@ Fork: https://github.com/brdelphus/lararadio
 
 ### Changed
 
+#### `mainwindow.ui` / `resources.qrc` / `deploy/linux/lararadio.desktop` / `.github/workflows/appimage.yml`
+- **New app icon**: the main window now sets `windowIcon` from
+  `:/images/icon.png` (previously it had no icon at all and fell back to
+  the generic Qt one). The single source of truth is
+  `images/icon.png`, embedded through `resources.qrc`; the old
+  `deploy/linux/lararadio.png` (512×512) was removed. The AppImage
+  packaging picks up the same file through `--icon-file`, and the
+  desktop entry's `Icon=` key was updated to `icon.png` to match the
+  name linuxdeploy gives the copy it drops in the AppDir root.
+
 #### `mainwindow.ui` / `mainwindow.h` / `mainwindow.cpp`
 - **Resizable window**: the window was fixed-size (`setFixedSize` +
   `sizePolicy Fixed`). It is now freely resizable (minimum 800×480).

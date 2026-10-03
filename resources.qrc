@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file>images/complete_logo.png</file>
+        <file>images/icon.png</file>
         <file>images/icons/appointment-new.svg</file>
         <file>images/icons/audio-x-generic.png</file>
         <file>images/icons/audio-x-mpegurl.png</file>

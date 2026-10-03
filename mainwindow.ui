@@ -25,6 +25,10 @@
   <property name="windowTitle">
    <string>SlopRadio</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="resources.qrc">
+    <normaloff>:/images/icon.png</normaloff>:/images/icon.png</iconset>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QTreeView" name="files">
     <property name="geometry">
