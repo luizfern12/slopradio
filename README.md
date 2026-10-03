@@ -1,5 +1,7 @@
-# SlopRadio
+# <img src="images/icon.png" alt="SlopRadio" width="40" height="40"> SlopRadio
+
 SlopRadio is an enhanced fork of [gutierre69/lararadio](https://github.com/gutierre69/lararadio) that leans heavily on LLM-generated code — hence the "slop" in the name.
+
 > See [What's new vs the original](#whats-new-vs-the-original) for what this fork adds on top.
 
 ---
