@@ -116,18 +116,37 @@ idle near zero — A alone only cuts frequency 3.3×.
   conversions out of the 33-LED loop (~198 `QColor` constructions per
   paint; `setBrush(QColor)` showed up at 0.97% in the profile).
 
-### VideoMixer 30 fps shader pass — `videomixer.cpp` (deferred)
+### VideoMixer shader pass — `videomixer.cpp` (deferred)
 
-`videomixer.cpp` starts a 33 ms timer driving `QOpenGLWidget::update()`
-on `showEvent`, stopping it on `hideEvent`. Whenever the video window is
-**visible** it renders 30×/sec indefinitely — even with nothing playing,
-where both deck textures fall back to `m_blackTex` and the output is
-solid black. Plus ~7 `uniformLocation(const char*)` string lookups per
-frame.
+`videomixer.cpp` starts a timer driving `QOpenGLWidget::update()` on
+`showEvent`, stopping it on `hideEvent`. Whenever the video window is
+**visible** it renders indefinitely — even with nothing playing, where
+both deck textures fall back to `m_blackTex` and the output is solid
+black. Plus ~7 `uniformLocation(const char*)` string lookups per frame.
 
-Not in the baseline (`video/enabled=false` meant the timer never ran), so
-deferring it costs nothing measurable so far. Fixing it means stopping
-the timer when the picture settles and restarting on demand.
+The timer used to be a flat 33 ms (~30 fps). It is now
+`SpectrumAnalyzer::frameIntervalMs(screen())` — the display's real
+refresh rate, re-read on `ScreenChangeInternal` — so that the EQ
+visualizer advances in step with the display instead of being capped at
+30 fps. On a 60 Hz panel that is unchanged; on a 144 Hz one it is 4.8×
+the repaints of the old flat value, so this item got *more* expensive
+to fix, not less.
+
+Measured on this machine (100 Hz display, video window visible,
+nothing playing), 30 s of `utime+stime`:
+
+| Build | Idle CPU | Note |
+|---|---|---|
+| Video window hidden | 3.37% | main window only |
+| Video window visible, `eqvisualizer=off` | 6.40% | mixer repainting black at 100 Hz |
+| Video window visible, `eqvisualizer=bars` | 6.40% | same; idle means no audio, so the EQ pass never draws |
+
+So the visible-but-idle mixer costs ~3.0 points, and the EQ pass adds
+nothing on its own when silent.
+
+Not in the 2.40% baseline (`video/enabled=false` meant the timer never
+ran), so deferring it costs nothing measurable so far. Fixing it means
+stopping the timer when the picture settles and restarting on demand.
 
 Traps to respect when picking this up:
 - A naive "skip if progress unchanged" **spins forever**:

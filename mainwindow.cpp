@@ -361,6 +361,11 @@ void MainWindow::init()
     // create the video window eagerly (cheap: it stays hidden until enabled)
     m_videoWindow = new VideoWindow(this);
     m_videoWindow->attachToPlayers(&audioplayer1, &audioplayer2);
+
+    // EQ visualizer for audio-only tracks. Fed from the same audio buffers as
+    // the VU meters, so it adds no tap on the audio path.
+    m_spectrum = new SpectrumAnalyzer(this);
+    m_videoWindow->setSpectrumAnalyzer(m_spectrum);
     connect(m_videoWindow, &VideoWindow::closed, this, [this]() {
         m_videoWindowShown = false;
         ui->btn_video->setChecked(false);
@@ -1057,6 +1062,11 @@ void MainWindow::on_btn_stop_clicked()
     currentVU_R = 0;
     vuMeterL->setLevel(currentVU_L);
     vuMeterR->setLevel(currentVU_R);
+
+    // Drop the held bars and peak markers, so the video output doesn't keep
+    // showing the last frame's spectrum after the transport stops.
+    if (m_spectrum)
+        m_spectrum->reset();
 }
 
 void MainWindow::on_btn_next_clicked()
@@ -1394,6 +1404,12 @@ void MainWindow::flash()
 
 void MainWindow::calculateRMS(const QAudioBuffer &buffer)
 {
+    // Feed the EQ analyzer first and unconditionally: it paces its own updates,
+    // and an audio-only track still needs the spectrum even when the VU
+    // meters end up idle.
+    if (m_spectrum)
+        m_spectrum->feed(buffer);
+
     const int channels = buffer.format().channelCount();
     if (channels < 1 || channels > 2)
         return;
@@ -1540,6 +1556,10 @@ void MainWindow::applyVideoOptions()
     VideoMixer *mixer = m_videoWindow->mixer();
     mixer->setEffects(VideoMixer::availableEffects(shaderDir));
     mixer->setCurrentEffect(settings->value("video/transition", "crossfade").toString());
+
+// EQ visualizer for audio-only tracks (off / bars).
+mixer->setEqMode(
+    VideoMixer::modeFromString(settings->value("video/eqvisualizer", "off").toString()));
 }
 
 void MainWindow::savePlaylist()

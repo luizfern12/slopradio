@@ -1,5 +1,6 @@
 #include "videomixer.h"
 #include "audioplayer.h"
+#include "spectrumanalyzer.h"
 
 #include <QOpenGLShaderProgram>
 #include <QOpenGLShader>
@@ -12,6 +13,7 @@
 #include <QOpenGLPixelTransferOptions>
 #include <QSurface>
 #include <QTimer>
+#include <QEvent>
 #include <QElapsedTimer>
 #include <QDir>
 #include <QFile>
@@ -39,6 +41,7 @@ const GLfloat kQuad[16] = {
 
 const char *kDefaultFrag = ":/shaders/crossfade.frag";
 const char *kDefaultVert = ":/shaders/fullscreen.vert";
+const char *kEqFrag = ":/shaders/eqbars.frag";
 
 // YUV → RGB converter (NV12 luma+interleaved CbCr, or YUV420P planar)
 // rendered into a per-deck RGBA FBO. The YUV planes are uploaded with the
@@ -122,11 +125,31 @@ VideoMixer::VideoMixer(QWidget *parent)
     m_seed = QRandomGenerator::global()->generateDouble();
 
     m_timer = new QTimer(this);
-    m_timer->setInterval(33); // ~30 fps
+    // Precise so the repaint lands on the vsync boundary rather than drifting
+    // against it; a coarse timer would jitter the visualizer by a frame.
+    m_timer->setTimerType(Qt::PreciseTimer);
     connect(m_timer, &QTimer::timeout, this, QOverload<>::of(&QOpenGLWidget::update));
+
+    syncFrameRate();
 }
 
 VideoMixer::~VideoMixer() = default;
+
+void VideoMixer::syncFrameRate()
+{
+    if (!m_timer)
+        return;
+
+    // Follow the screen this widget is actually on, so moving the output to a
+    // different monitor picks up that monitor's rate.
+    const int intervalMs = SpectrumAnalyzer::frameIntervalMs(screen());
+    m_timer->setInterval(intervalMs);
+
+    // The analyzer is paced to match, otherwise it would keep producing rows
+    // that are overwritten before they are ever drawn.
+    if (m_analyzer)
+        m_analyzer->setFrameIntervalMs(intervalMs);
+}
 
 void VideoMixer::setDeck(int index, AudioPlayer *player)
 {
@@ -234,6 +257,32 @@ QList<VideoMixer::Effect> VideoMixer::availableEffects(const QString &customShad
     return out;
 }
 
+VideoMixer::EqMode VideoMixer::modeFromString(const QString &value)
+{
+    if (value == QLatin1String("bars"))
+        return EqMode::Bars;
+    return EqMode::Off;
+}
+
+QString VideoMixer::modeToString(EqMode mode)
+{
+    return mode == EqMode::Bars ? QStringLiteral("bars") : QStringLiteral("off");
+}
+
+void VideoMixer::setSpectrumAnalyzer(SpectrumAnalyzer *analyzer)
+{
+    m_analyzer = analyzer;
+    m_eqLastSeq = 0;
+    // Pick up the interval already decided for this screen; the analyzer is
+    // created after the mixer, so it would otherwise keep its own guess.
+    syncFrameRate();
+}
+
+void VideoMixer::setEqMode(EqMode mode)
+{
+    m_eqMode = mode;
+}
+
 QString VideoMixer::readSource(const QString &path) const
 {
     QFile f(path);
@@ -270,6 +319,19 @@ void VideoMixer::initializeGL()
     }
     m_blackTex->setMinificationFilter(QOpenGLTexture::Nearest);
     m_blackTex->setMagnificationFilter(QOpenGLTexture::Nearest);
+
+    // EQ levels: a single row, kBands wide, holding the bar height in red and
+    // the peak marker in green. The shader draws the bars from it, so this
+    // never needs more than kBands * 4 bytes per frame.
+    m_eqTex = std::make_unique<QOpenGLTexture>(QOpenGLTexture::Target2D);
+    m_eqTex->setFormat(QOpenGLTexture::RGBA8_UNorm);
+    m_eqTex->setSize(SpectrumAnalyzer::kBands, 1);
+    m_eqTex->allocateStorage(QOpenGLTexture::RGBA, QOpenGLTexture::UInt8);
+    // Nearest on purpose: each texel is one bar, and interpolating between
+    // them would leak levels across bands.
+    m_eqTex->setMinificationFilter(QOpenGLTexture::Nearest);
+    m_eqTex->setMagnificationFilter(QOpenGLTexture::Nearest);
+    m_eqTex->setWrapMode(QOpenGLTexture::ClampToEdge);
 
     // Quad geometry. Attributes are always bound to locations 0 (vertex) and
     // 1 (texCoord) via bindAttributeLocation in rebuildProgram().
@@ -312,7 +374,18 @@ void VideoMixer::showEvent(QShowEvent *event)
     QOpenGLWidget::showEvent(event);
     // pick up the currently active deck on first show
     refreshIncomingDeck();
+    // The window only has a screen once it is on one, so the refresh rate is
+    // not knowable in the constructor.
+    syncFrameRate();
     ensureTimer();
+}
+
+void VideoMixer::changeEvent(QEvent *event)
+{
+    QOpenGLWidget::changeEvent(event);
+    // Dragging the output to another monitor has to change the target rate.
+    if (event->type() == QEvent::ScreenChangeInternal)
+        syncFrameRate();
 }
 
 void VideoMixer::hideEvent(QHideEvent *event)
@@ -674,6 +747,104 @@ GLuint VideoMixer::sceneTextureId(int deck) const
     return 0;
 }
 
+void VideoMixer::uploadEqRow()
+{
+    if (!m_eqTex || !m_eqTex->isStorageAllocated() || !m_analyzer)
+        return;
+
+    const SpectrumAnalyzer::Frame frame = m_analyzer->takeFrame();
+    if (!frame.valid)
+        return;
+
+    // The analyzer updates on its own ~33 ms cadence, so there is normally one
+    // new frame per painted frame. Re-uploading an unchanged row would be
+    // harmless but pointless, and skipping it is what lets the texture keep
+    // the last levels while the display is idle.
+    if (frame.seq == m_eqLastSeq)
+        return;
+
+    if (frame.row.width() != SpectrumAnalyzer::kBands
+        || frame.row.height() != 1
+        || frame.row.format() != QImage::Format_RGBA8888) {
+        return;
+    }
+
+    m_eqTex->setData(QOpenGLTexture::RGBA, QOpenGLTexture::UInt8,
+                     frame.row.constBits());
+    m_eqLastSeq = frame.seq;
+}
+
+void VideoMixer::renderEq()
+{
+    if (!ensureEqProgram() || !m_eqTex)
+        return;
+
+    QOpenGLFunctions *f = QOpenGLContext::currentContext()->functions();
+    const int dpr = devicePixelRatioF();
+    f->glViewport(0, 0, width() * dpr, height() * dpr);
+    f->glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    f->glClear(GL_COLOR_BUFFER_BIT);
+
+    m_eqProgram->bind();
+    f->glActiveTexture(GL_TEXTURE0);
+    m_eqTex->bind();
+    const int fromLoc = m_eqProgram->uniformLocation("from");
+    if (fromLoc >= 0)
+        m_eqProgram->setUniformValue(fromLoc, 0);
+    m_eqProgram->setUniformValue(m_eqProgram->uniformLocation("uBands"),
+                                 float(SpectrumAnalyzer::kBands));
+    m_eqProgram->setUniformValue(m_eqProgram->uniformLocation("uGap"), 0.18f);
+    m_eqProgram->setUniformValue(m_eqProgram->uniformLocation("uPeakSize"), 0.008f);
+
+    if (m_vao && m_vao->isCreated()) {
+        m_vao->bind();
+        f->glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        m_vao->release();
+    } else {
+        m_vbo->bind();
+        f->glEnableVertexAttribArray(0);
+        f->glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat),
+                                 reinterpret_cast<const void *>(0));
+        f->glEnableVertexAttribArray(1);
+        f->glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat),
+                                 reinterpret_cast<const void *>(2 * sizeof(GLfloat)));
+        f->glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
+
+    m_eqTex->release();
+    m_eqProgram->release();
+}
+
+bool VideoMixer::ensureEqProgram()
+{
+    if (m_eqProgram)
+        return true;
+    // A broken shader must not be retried every frame.
+    if (m_eqFailed)
+        return false;
+
+    const QString frag = readSource(QLatin1String(kEqFrag));
+    if (frag.isEmpty()) {
+        m_eqFailed = true;
+        return false;
+    }
+
+    auto program = std::make_unique<QOpenGLShaderProgram>();
+    program->bindAttributeLocation("vertex", 0);
+    program->bindAttributeLocation("texCoord", 1);
+    if (!program->addShaderFromSourceCode(QOpenGLShader::Vertex,
+                                          readSource(QLatin1String(kDefaultVert)))
+        || !program->addShaderFromSourceCode(QOpenGLShader::Fragment, frag)
+        || !program->link()) {
+        qWarning() << "VideoMixer: EQ visualizer shader failed to build";
+        m_eqFailed = true;
+        return false;
+    }
+
+    m_eqProgram = std::move(program);
+    return true;
+}
+
 bool VideoMixer::ensureProgram()
 {
     if (m_program && m_loadedId == m_currentEffect)
@@ -758,6 +929,17 @@ void VideoMixer::renderScene()
 
     const bool fromActive = m_decks[from] && m_decks[from]->isVideoActive();
     const bool toActive = m_decks[to] && m_decks[to]->isVideoActive();
+
+    // Audio-only material: show the EQ visualizer instead of an effect running
+    // over black. Only outside a transition, so fromHeld (which keeps the
+    // outgoing deck's last frame on screen) is never blanked out mid-crossfade.
+    if (m_eqMode == EqMode::Bars
+        && !fromActive && !toActive && !m_inTransition && m_analyzer
+        && m_analyzer->hasData()) {
+        uploadEqRow();
+        renderEq();
+        return;
+    }
 
     const bool fromPlaying = m_decks[from] && (m_decks[from]->isPlaying() || m_decks[from]->isPaused());
     const bool toPlaying = m_decks[to] && (m_decks[to]->isPlaying() || m_decks[to]->isPaused());

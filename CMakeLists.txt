@@ -80,6 +80,7 @@ qt_add_qml_module(appLaraRadio
         SOURCES cuewindow.h cuewindow.cpp
         RESOURCES cuewindow.ui
         SOURCES videomixer.h videomixer.cpp
+        SOURCES spectrumanalyzer.h spectrumanalyzer.cpp
         SOURCES videowindow.h videowindow.cpp
         RESOURCES videowindow.ui
         SOURCES custonIconProvider.h

@@ -10,6 +10,7 @@
 #include <memory>
 
 class AudioPlayer;
+class SpectrumAnalyzer;
 class QOpenGLShaderProgram;
 class QOpenGLTexture;
 class QOpenGLVertexArrayObject;
@@ -64,6 +65,21 @@ public:
 
     static QList<Effect> availableEffects(const QString &customShaderDir);
 
+    // EQ visualizer: what to show on the video output when the incoming
+    // deck is playing audio with no video.
+    enum class EqMode {
+        Off,
+        Bars,
+    };
+    static EqMode modeFromString(const QString &value);
+    static QString modeToString(EqMode mode);
+
+    // The analyzer is not owned here — it lives in MainWindow and is fed from
+    // the same audio buffers that drive the VU meters.
+    void setSpectrumAnalyzer(SpectrumAnalyzer *analyzer);
+    void setEqMode(EqMode mode);
+    EqMode eqMode() const { return m_eqMode; }
+
     // current visual mix progress, 0..1 (exposed for tests/diagnostics)
     float progress() const { return m_smoothProgress; }
 
@@ -75,11 +91,23 @@ protected:
     void resizeGL(int w, int h) override;
     void showEvent(QShowEvent *event) override;
     void hideEvent(QHideEvent *event) override;
+    void changeEvent(QEvent *event) override;
 
 private:
     void ensureTimer();
+
+    // Repaint at the display's refresh rate, and pace the analyzer to match.
+    void syncFrameRate();
+
     void uploadFrames();
     void renderScene();
+
+    // EQ pass. uploadEqRow() pushes the latest band levels into a 1-row
+    // texture; renderEq() draws them as bars.
+    void uploadEqRow();
+    void renderEq();
+    bool ensureEqProgram();
+
     bool ensureProgram();
     bool rebuildProgram(const Effect &effect);
     bool effectExists(const QString &id) const;
@@ -121,6 +149,14 @@ private:
     QString m_currentEffect;
     QString m_loadedId;
     QSet<QString> m_failedEffects; // ids that failed to compile (never retry)
+
+    // EQ: analyzer owned by MainWindow, level texture + program here.
+    SpectrumAnalyzer *m_analyzer = nullptr;
+    EqMode m_eqMode = EqMode::Off;
+    std::unique_ptr<QOpenGLTexture> m_eqTex;
+    std::unique_ptr<QOpenGLShaderProgram> m_eqProgram;
+    quint64 m_eqLastSeq = 0;    // last frame uploaded, 0 = nothing yet
+    bool m_eqFailed = false;
 
     qint64 m_lastFrameStart[2] = {-1, -1};
     QVideoFrame m_latest[2];

@@ -104,6 +104,72 @@ Fork: https://github.com/brdelphus/lararadio
   `maxVolume` in sync with its volume slider so the shared fade timer
   never touches the preview level.
 
+#### `spectrumanalyzer.h` / `spectrumanalyzer.cpp` (new)
+- **Spectrum analysis for the video output**: an iterative radix-2 FFT
+  over a Hann-windowed mono downmix, fed from `calculateRMS()` — the
+  same buffers that already drive the VU meters, so there is no extra
+  tap on the audio path. No new dependency.
+- **32 bars, log-spaced where the transform allows it**: band edges are
+  spaced logarithmically from 30 Hz, then converted to FFT bins
+  (`bin = Hz * kFftSize / rate`) and each bar is given at least one bin.
+  Without that last step the low bands would all collapse onto bin 1
+  (43 Hz wide at 44.1 kHz), read identically, and put the peak in
+  whichever band came last.
+- **Instant attack, gradual release**: bars snap up on a transient and
+  ease back down, and a peak marker lingers a couple of seconds above
+  them. Levels are scaled across -72..-12 dB.
+- **Paced to the display's refresh rate**: the FFT is throttled to one
+  update per painted frame rather than one per audio callback. The
+  interval comes from `QScreen::refreshRate()`, so the graph advances in
+  step with the display instead of at a fixed 30 fps.
+- The only thing handed to the renderer is a 32x1 RGBA image (bar
+  height in R, peak in G), copied under a mutex — the
+  `audioBufferReceived` callback runs on the multimedia thread while
+  `paintGL` runs on the GUI thread.
+
+#### `videomixer.h` / `videomixer.cpp` / `shaders/eqbars.frag` (new)
+- **EQ visualizer pass**: when the incoming deck has no active video
+  (`!isVideoActive()`) and no transition is running, the output shows
+  the bar graph instead of a transition effect running over black.
+  Real video is untouched, and `fromHeld` — which keeps the outgoing
+  deck's last frame on screen — is never blanked mid-crossfade.
+- **`renderEq()`**: the fragment shader draws the bars, the gaps
+  between them and the green→yellow→red ramp from height. The CPU only
+  uploads the 128-byte level row per frame, so the visual is entirely
+  GPU-side.
+- A dedicated pass rather than an effect `.frag`, so custom user shaders
+  in the shader folder keep their existing single-sampler interface.
+- Failures are sticky: a missing or broken shader is reported once and
+  then skipped, never retried per frame.
+
+#### `videomixer.h` / `videomixer.cpp` / `spectrumanalyzer.h` / `spectrumanalyzer.cpp`
+- **Repaint at the display rate**: the mixer's repaint timer was pinned
+  at 33 ms (~30 fps), which capped the visualizer at 30 fps even on a
+  faster display. It now runs at `QScreen::refreshRate()` and is a
+  `Qt::PreciseTimer`, so the repaint lands on the vsync boundary instead
+  of drifting against it. Rate is re-read when the window moves to
+  another monitor (`ScreenChangeInternal`).
+- `syncFrameRate()` is the single place that decides the target rate and
+  pushes it to the analyzer, so the two cannot drift apart.
+- **Fixed a pacing bug**: `feed()` claimed to throttle to one FFT per
+  painted frame but never actually skipped anything — it computed the
+  elapsed time and fed it to the decay while still running the FFT on
+  *every* audio callback. With the AAC in an `.mp4` (1024-frame buffers)
+  that is ~43 FFTs/s regardless of what the display could show. The gate
+  is now real: buffers arriving inside the frame interval are dropped
+  before the FFT.
+
+#### `videowindow.h` / `videowindow.cpp` / `mainwindow.h` / `mainwindow.cpp`
+- Wires the analyzer through to the mixer. `MainWindow` owns the
+  analyzer and `VideoMixer` only borrows the pointer. `reset()` is
+  called on stop so the output doesn't keep showing the last frame's
+  spectrum after the transport halts.
+
+#### `configdialog.ui` / `configdialog.cpp`
+- **EQ visualizer (Vídeo tab)**: a combo saved to `video/eqvisualizer`
+  with *Desligado* (default) and *Barras*. Opt-in, so existing setups
+  are unchanged.
+
 ### Changed
 
 #### `mainwindow.ui` / `resources.qrc` / `deploy/linux/` / `.github/workflows/appimage.yml`

@@ -6,6 +6,7 @@
 
 class AudioPlayer;
 class VideoMixer;
+class SpectrumAnalyzer;
 
 namespace Ui {
 class VideoWindow;
@@ -25,6 +26,7 @@ public:
     void setDeck(int index, AudioPlayer *player);
     void setIncomingDeck(int index);
     void attachToPlayers(AudioPlayer *player1, AudioPlayer *player2);
+    void setSpectrumAnalyzer(SpectrumAnalyzer *analyzer);
     VideoMixer *mixer() const;
 
 signals:

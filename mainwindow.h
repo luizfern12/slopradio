@@ -11,6 +11,7 @@
 #include "buttonhole.h"
 #include "cuewindow.h"
 #include "videowindow.h"
+#include "spectrumanalyzer.h"
 #include "QAudioOutput"
 #include "QFileSystemModel"
 #include <QProgressBar>
@@ -150,6 +151,10 @@ private:
     QString SayTimeAudio;
 
     QAudioBufferOutput* audioBufferOutput;
+
+    // Feeds the video window's EQ visualizer from the same buffers that drive
+    // the VU meters. Owned here; VideoMixer only borrows the pointer.
+    SpectrumAnalyzer *m_spectrum = nullptr;
 
     QAudioDevice* inputDevice;
     QProgressBar* progressBar;

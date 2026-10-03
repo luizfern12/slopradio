@@ -109,6 +109,77 @@ Fork: https://github.com/brdelphus/lararadio
   volume para o timer de fade compartilhado não mexer no nível da
   pré escuta.
 
+#### `spectrumanalyzer.h` / `spectrumanalyzer.cpp` (novo)
+- **Análise de espectro para a saída de vídeo**: uma FFT radix-2
+  iterativa sobre um downmix mono com janela de Hann, alimentada por
+  `calculateRMS()` — os mesmos buffers que já movem os VU meters,
+  então não há um segundo ponto de escuta no caminho do áudio.
+  Nenhuma dependência nova.
+- **32 barras, em escala logarítmica onde a transformação permite**:
+  as bordas das bandas são espaçadas em log a partir de 30 Hz, depois
+  convertidas para bins da FFT (`bin = Hz * kFftSize / taxa`) e cada
+  barra recebe pelo menos um bin. Sem esse último passo as bandas mais
+  baixas cairiam todas no bin 1 (43 Hz de largura em 44,1 kHz),
+  leriano idênticas e o pico ficaria na última banda.
+- **Ataque instantâneo, queda gradual**: as barras sobem de uma vez
+  num transiente e descem suavemente, e um marcador de pico fica
+  pendurado alguns segundos acima delas. Os níveis são escalados de
+  -72 a -12 dB.
+- **Ritmo atrelado à taxa de atualização da display**: a FFT é
+  limitada a uma atualização por quadro desenhado em vez de uma por
+  callback de áudio. O intervalo vem de `QScreen::refreshRate()`, então
+  o gráfico avança junto com a tela em vez de fixo em 30 fps.
+- O que sai daqui para o renderizador é apenas uma imagem RGBA
+  32x1 (altura da barra em R, pico em G), copiada sob mutex — o
+  callback `audioBufferReceived` roda na thread de multimídia e o
+  `paintGL` na thread da GUI.
+
+#### `videomixer.h` / `videomixer.cpp` / `shaders/eqbars.frag` (novo)
+- **Passagem de visualizador de EQ**: quando o deck que entra não tem
+  vídeo ativo (`!isVideoActive()`) e nenhuma transição está em curso,
+  a saída mostra o gráfico de barras em vez de um efeito de transição
+  rodando sobre preto. Vídeo real não é tocado, e o `fromHeld` — que
+  mantém o último quadro do deck de saída na tela — nunca é apagado no
+  meio de um crossfade.
+- **`renderEq()`**: o fragment shader desenha as barras, os espaços
+  entre elas e o degradê verde→amarelo→vermelho a partir da altura. A
+  CPU só envia a linha de 128 bytes por quadro, então o visual é
+  inteiramente do lado da GPU.
+- Uma passagem dedicada em vez de um `.frag` de efeito, para que
+  shaders customizados do usuário continuem com a interface de uma
+  única sampler.
+- Falhas são permanentes: um shader ausente ou quebrado é reportado uma
+  vez e depois ignorado, nunca tentado a cada quadro.
+
+#### `videomixer.h` / `videomixer.cpp` / `spectrumanalyzer.h` / `spectrumanalyzer.cpp`
+- **Redesenho na taxa da display**: o timer de repaint do mixer estava
+  fixo em 33 ms (~30 fps), o que limitava o visualizador em 30 fps mesmo
+  numa tela mais rápida. Agora ele roda em
+  `QScreen::refreshRate()` e é um `Qt::PreciseTimer`, então o repaint
+  cai na borda do vsync em vez de derivar em relação a ele. A taxa é
+  lida de novo quando a janela vai para outro monitor
+  (`ScreenChangeInternal`).
+- `syncFrameRate()` é o único lugar que decide a taxa alvo e a passa
+  para o analisador, então os dois não podem ficar dessincronizados.
+- **Corrigido um bug de ritmo**: o `feed()` dizia limitar a FFT a uma
+  por quadro desenhado mas nunca descartava nada — ele calculava o
+  tempo decorrido e passava para a queda, mesmo assim rodando a FFT em
+  *todos* os callbacks de áudio. Com o AAC de um `.mp4` (buffers de
+  1024 quadros) isso dá ~43 FFTs/s, independente do que a display
+  conseguisse mostrar. O limite agora é real: buffers que chegam dentro
+  do intervalo do quadro são descartados antes da FFT.
+
+#### `videowindow.h` / `videowindow.cpp` / `mainwindow.h` / `mainwindow.cpp`
+- Liga o analisador ao mixer. A `MainWindow` é dona do analisador e a
+  `VideoMixer` apenas usa o ponteiro. `reset()` é chamado ao parar
+  para a saída não continuar mostrando o espectro do último quadro
+  depois que o transporte para.
+
+#### `configdialog.ui` / `configdialog.cpp`
+- **Visualizador de EQ (aba Vídeo)**: uma combo salva em
+  `video/eqvisualizer` com *Desligado* (padrão) e *Barras*.
+  Opt-in, então as configurações existentes não mudam.
+
 ### Alterado
 
 #### `mainwindow.ui` / `resources.qrc` / `deploy/linux/` / `.github/workflows/appimage.yml`

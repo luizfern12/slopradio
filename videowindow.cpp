@@ -50,6 +50,12 @@ void VideoWindow::attachToPlayers(AudioPlayer *player1, AudioPlayer *player2)
     setDeck(2, player2);
 }
 
+void VideoWindow::setSpectrumAnalyzer(SpectrumAnalyzer *analyzer)
+{
+    if (m_mixer)
+        m_mixer->setSpectrumAnalyzer(analyzer);
+}
+
 VideoMixer *VideoWindow::mixer() const
 {
     return m_mixer;

@@ -48,6 +48,15 @@ ConfigDialog::ConfigDialog(QWidget *parent)
     ui->video_hwdecode->addItem(tr("VA-API — AMD e Intel"), QStringLiteral("vaapi"));
     ui->video_hwdecode->addItem(tr("CUDA — NVIDIA"), QStringLiteral("cuda"));
     ui->video_hwdecode->addItem(tr("Desligada (CPU)"), QStringLiteral("off"));
+
+    // EQ visualizer shown on the video output when the incoming deck is an
+    // audio-only track.
+    ui->video_eqvisualizer->addItem(tr("Desligado"), QStringLiteral("off"));
+    ui->video_eqvisualizer->addItem(tr("Barras"), QStringLiteral("bars"));
+    const QString eqMode = settings.value("video/eqvisualizer", QStringLiteral("off")).toString();
+    const int eidx = ui->video_eqvisualizer->findData(eqMode);
+    ui->video_eqvisualizer->setCurrentIndex(eidx >= 0 ? eidx : 0);
+
     const QString hwMode = settings.value("video/hwdecode", QStringLiteral("auto")).toString();
     const int hidx = ui->video_hwdecode->findData(hwMode);
     ui->video_hwdecode->setCurrentIndex(hidx >= 0 ? hidx : 0);
@@ -87,6 +96,7 @@ void ConfigDialog::accept()
     settings.setValue("video/transition", ui->video_transition->currentData().toString());
     settings.setValue("video/shaderDir", ui->video_shaderDir->text());
     settings.setValue("video/hwdecode", ui->video_hwdecode->currentData().toString());
+    settings.setValue("video/eqvisualizer", ui->video_eqvisualizer->currentData().toString());
 
     this->close();
 }

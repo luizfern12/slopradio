@@ -51,5 +51,6 @@
         <file>shaders/flip3d.frag</file>
         <file>shaders/cube3d.frag</file>
         <file>shaders/rotate3d.frag</file>
+        <file>shaders/eqbars.frag</file>
     </qresource>
 </RCC>

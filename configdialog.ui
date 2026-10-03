@@ -304,6 +304,21 @@
         <widget class="QComboBox" name="video_transition"/>
        </item>
        <item>
+        <widget class="QLabel" name="label_eqvisualizer">
+         <property name="font">
+          <font>
+           <pointsize>9</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Visualizador de EQ na saída de vídeo (quando a faixa não tem vídeo)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="video_eqvisualizer"/>
+       </item>
+       <item>
         <widget class="QLabel" name="label_hwDecode">
          <property name="font">
           <font>
