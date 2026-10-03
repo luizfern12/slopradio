@@ -109,7 +109,7 @@ jobs:
             --appdir AppDir \
             --executable build/appLaraRadio \
             --desktop-file deploy/linux/lararadio.desktop \
-            --icon-file images/icon.png \
+            --icon-file deploy/linux/icon.png \
             --plugin qt
 
           mkdir -p dist

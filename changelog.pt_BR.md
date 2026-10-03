@@ -111,15 +111,19 @@ Fork: https://github.com/brdelphus/lararadio
 
 ### Alterado
 
-#### `mainwindow.ui` / `resources.qrc` / `deploy/linux/lararadio.desktop` / `.github/workflows/appimage.yml`
+#### `mainwindow.ui` / `resources.qrc` / `deploy/linux/` / `.github/workflows/appimage.yml`
 - **Novo ícone do app**: a janela principal agora define `windowIcon`
   a partir de `:/images/icon.png` (antes não havia ícone algum e caía
-  no genérico do Qt). A fonte única é `images/icon.png`, embutida pelo
-  `resources.qrc`; o antigo `deploy/linux/lararadio.png` (512×512) foi
-  removido. O empacotamento do AppImage usa o mesmo arquivo via
-  `--icon-file`, e a chave `Icon=` do arquivo `.desktop` foi ajustada
-  para `icon.png`, igual ao nome que o linuxdeploy dá para a cópia que
-  ele deixa na raiz do AppDir.
+  no genérico do Qt). `images/icon.png` (1024×1024) é o arquivo master
+  e é embutido pelo `resources.qrc`; o antigo
+  `deploy/linux/lararadio.png` foi substituído por
+  `deploy/linux/icon.png` (512×512, regere com
+  `convert images/icon.png -resize 512x512 -strip deploy/linux/icon.png`).
+  São dois tamanhos porque o linuxdeploy **rejeita** qualquer resolução
+  fora dos tamanhos hiconf (máx. 512×512) e aborta o build do AppImage,
+  enquanto o Qt aceita o master. A chave `Icon=` do `.desktop` agora é
+  `icon` — sem extensão, como o appimagetool resolve
+  `AppDir/<Icon=>.png`.
 
 #### `mainwindow.ui` / `mainwindow.h` / `mainwindow.cpp`
 - **Janela redimensionável**: a janela era de tamanho fixo
