@@ -57,10 +57,6 @@ Video decoding can be hardware-accelerated — **Auto / VA-API / CUDA / Off**, c
 - **Output device selection** — pick the main output *and* a dedicated cue/headphones device (**Settings → Saídas**), hot-plug aware.
 - **Playlist improvements** — drag & drop from the file manager (files or whole folders), multi-select with `Ctrl`/`Shift` + `Del` to remove, and playback pointers that survive row removals.
 
-### 🛠️ Settings
-
-The settings dialog was reorganized into tabs:
-
 ---
 
 ## 🔧 Build from source
