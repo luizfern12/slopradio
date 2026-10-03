@@ -203,7 +203,10 @@ void SpectrumAnalyzer::rebuildBands()
     const float nyquist = 0.5f * float(m_sampleRate);
     const float binHz = float(m_sampleRate) / float(kFftSize);
     const float logLo = std::log(kLowestHz);
-    const float logHi = std::log(std::max(kLowestHz * 1.01f, nyquist));
+    // The top of the log range is kHighestHz, not Nyquist: see kHighestHz for
+    // why pointing bars above 16 kHz leaves the right end of the graph dark.
+    const float logHi = std::log(std::max(kLowestHz * 1.01f,
+                                           std::min(kHighestHz, nyquist)));
 
     auto hzToBin = [&](float t) {
         const float hz = std::exp(logLo + (logHi - logLo) * t);

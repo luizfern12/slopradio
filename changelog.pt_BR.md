@@ -281,6 +281,31 @@ Fork: https://github.com/brdelphus/lararadio
   `analysisCount()` expõe a contagem para o gate ser verificado
   diretamente em vez de cronometrar um laço.
 
+#### `spectrumanalyzer.h` / `spectrumanalyzer.cpp`
+- **O gráfico parava antes da borda direita da janela**: o efeito de
+  barras terminava cerca de 66 px cedo, com algo como três das suas 64
+  slots nunca desenhadas. Não era o render nem a FFT — ruído branco
+  através da `VideoMixer` real desenhava 64 barras de x = 1 a x = 958 de
+  960, e tons puros de 16.5/18/20 kHz caíam nas barras 61/62/63 com
+  249–255/255. O `rebuildBands()` mapeava a faixa logarítmica até o
+  Nyquist, o que colocava as barras 61–63 em **16.15 → 22.05 kHz**, e
+  todo arquivo de 128 kbps é cortado perto dos 16 kHz — três slots
+  apontadas para o silêncio, em todo arquivo, e todo visualizador
+  (barras, montanha, lateral, pontos, círculo, espelho radial) mostrava
+  a mesma borda direita vazia.
+- A faixa agora termina em **`kHighestHz` (16 kHz)**, ainda limitada pelo
+  Nyquist para que uma taxa de amostragem baixa continue vencendo.
+  16 kHz é a faixa superior de um equalizador gráfico clássico, então a
+  troca é de uma faixa quase sempre silenciosa por um gráfico que
+  realmente preenche a janela.
+- As barras 61–63 agora cobrem 11.9 → 16 kHz. Nos 13 arquivos de teste
+  **nenhuma barra está escura em nenhum deles**, e a barra do topo ainda
+  acende em 62% das amostras em média (pior arquivo 41%). O `tonetest` —
+  que antes só imprimia — agora verifica a posição que sustenta isso:
+  15.9 kHz cai na barra 63 em escala máxima, e 16.5/18/20/21.9 kHz não
+  acendem nada. Reverter a faixa volta todos os tons altos cerca de três
+  barras para baixo e volta a acender 16.5 kHz em escala máxima.
+
 ### Alterado
 
 #### `mainwindow.ui` / `resources.qrc` / `deploy/linux/` / `.github/workflows/appimage.yml`

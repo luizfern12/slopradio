@@ -267,6 +267,29 @@ Fork: https://github.com/brdelphus/lararadio
   204), and `analysisCount()` exposes the count so the gate can be
   checked directly rather than by timing a loop.
 
+#### `spectrumanalyzer.h` / `spectrumanalyzer.cpp`
+- **The graph stopped short of the right edge of the window**: the bars
+  effect ended about 66 px early, with roughly three of its 64 slots
+  never drawing. It was not the renderer and not the FFT — white noise
+  through the real `VideoMixer` drew 64 bars from x = 1 to x = 958 of
+  960, and pure tones at 16.5/18/20 kHz landed on bars 61/62/63 at
+  249–255/255. `rebuildBands()` mapped the log range all the way to
+  Nyquist, which put bars 61–63 in **16.15 → 22.05 kHz**, and every
+  128 kbps file is lowpassed near 16 kHz — so three slots were pointed
+  at silence, in every file, and every visualizer (bars, mountain, side,
+  dots, circle, radial mirror) showed the same empty right-hand edge.
+- The range now stops at **`kHighestHz` (16 kHz)**, additionally capped
+  by Nyquist so a low sample rate still wins. 16 kHz is the top band of
+  a classic graphic equalizer, so the trade is a range that is almost
+  always silent for a graph that actually fills the window.
+- Bars 61–63 now cover 11.9 → 16 kHz. Across all 13 test files **no bar
+  is dark in any of them**, and the top bar still lights in 62% of
+  samples on average (worst file 41%). `tonetest` — which previously
+  only printed — now asserts the placement that pins this: 15.9 kHz
+  lands on bar 63 at full scale, and 16.5/18/20/21.9 kHz light nothing
+  at all. Reverting the ceiling moves every high tone back down about
+  three bars and lights 16.5 kHz at full level again.
+
 ### Changed
 
 #### `mainwindow.ui` / `resources.qrc` / `deploy/linux/` / `.github/workflows/appimage.yml`

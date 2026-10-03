@@ -45,6 +45,17 @@ public:
     // it would only widen the unused gap on the left of the graph.
     static constexpr float kLowestHz = 30.0f;
 
+    // Highest frequency plotted, and the real reason the graph stops where it
+    // does. Going all the way to Nyquist would spend the last three of the 64
+    // slots on 16.1 -> 22 kHz, which is empty air for every 128 kbps file in
+    // existence — codecs lowpass near 16 kHz — so those bars stayed dark and
+    // the graph never reached the right edge of the window. 16 kHz is also the
+    // top band of a classic graphic equalizer, so this trades a range that is
+    // almost always silent for a graph that actually fills.
+    //
+    // Capped by Nyquist as well, so a low sample rate still wins.
+    static constexpr float kHighestHz = 16000.0f;
+
     // Frame interval the analyzer aims for, in milliseconds, so the graph
     // advances once per painted frame rather than at a fixed 30 fps. The audio
     // buffer callback fires far more often than either, and analysing every
