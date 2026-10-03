@@ -60,7 +60,7 @@ void main()
         // Ramp across the lit stack rather than across the whole column, so a
         // quiet column still runs green to red over its own height — the same
         // "relative to this bar" reading eqbars.frag uses.
-        float t = 1.0 - (seg + 0.5) / (level * kSegs);
+        float t = (seg + 0.5) / (level * kSegs);
         gl_FragColor = vec4(barColor(t), 1.0);
         return;
     }

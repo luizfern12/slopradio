@@ -228,6 +228,28 @@ Fork: https://github.com/brdelphus/lararadio
   segments where a bar gives 1; radialmirror keeps the hub clear and
   centres all 64 spokes on the mid ring to within **1 px**.
 
+#### `shaders/eqmirrorbars.frag` (new) / `videomixer.cpp` / `resources.qrc`
+- **Mirrored bars** (*Barras espelhadas*), offered straight after *Barras*
+  because it is that mode with its reference line moved off the floor and
+  onto the middle of the output. The slots, the gutter, the level and
+  peak-hold row, the guarded uniforms and the colour ramp are all
+  `eqbars`'; the only edit is measuring distance from the centre instead
+  of from the bottom, so a bar of height `level` grows `level/2` upward
+  and `level/2` downward and covers exactly the rows it covered before —
+  the lit area is unchanged, which is why "differs from bars" has to be a
+  claim about where the pixels sit rather than how many there are.
+- One `abs()` about the middle stands in for both halves, so `y` and
+  `1 - y` produce the same number and the two sides agree by construction
+  instead of by drawing the shape twice. The peak marker rides both tips
+  from the same branch; `uPeakSize` is still a screen height, so it is
+  doubled where `d` advances at twice that rate. Cost is unchanged: one
+  row of ~256 bytes from the analyzer.
+- Asserted in `rendertest`: the top and bottom rows are both clear — the
+  claim that separates it from bars, whose floor shows one run per slot —
+  the middle row shows all **64** runs and still reaches both side
+  edges, and all **832** lit columns are symmetric about the mid-line with
+  a worst error of **0** rows and sit in a single run.
+
 #### `videomixer.h` / `videomixer.cpp` / `spectrumanalyzer.h` / `spectrumanalyzer.cpp`
 - **Repaint at the display rate**: the mixer's repaint timer was pinned
   at 33 ms (~30 fps), which capped the visualizer at 30 fps even on a
@@ -304,6 +326,19 @@ Fork: https://github.com/brdelphus/lararadio
   three bars and lights 16.5 kHz at full level again.
 
 ### Changed
+
+#### `shaders/eqbars.frag` / `eqmountain.frag` / `eqside.frag` / `eqdots.frag` / `eqmirrorbars.frag`
+- **The EQ colour ramp now runs green at the base through yellow to red
+  at the tip.** It was the other way round: `barColor(0)` is green and
+  each of these five fed it `0` at the *tip*, so the floor of a bar came
+  out red and its point green. That is also why `eqbars`' own comment —
+  "Green at the base, through yellow, to red at the tip" — had stopped
+  describing its code; the comment now does. Only the direction the ramp
+  is read in changed, so the colours on screen and every pixel count in
+  `rendertest` are untouched. `eqcircle` and `eqradialmirror` have no
+  base-to-tip gradient to invert — they colour the whole spoke by its
+  level, green when quiet and red when loud — so they were left alone
+  and now read the same way as the bars instead of the opposite.
 
 #### `mainwindow.ui` / `resources.qrc` / `deploy/linux/` / `.github/workflows/appimage.yml`
 - **New app icon**: the main window now sets `windowIcon` from

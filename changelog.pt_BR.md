@@ -241,6 +241,29 @@ Fork: https://github.com/brdelphus/lararadio
   dá 1; o espelho radial mantém o hub limpo e centraliza os 64 raios no
   anel do meio com precisão de **1 px**.
 
+#### `shaders/eqmirrorbars.frag` (novo) / `videomixer.cpp` / `resources.qrc`
+- **Barras espelhadas**, oferecidas logo depois de *Barras* porque é esse
+  modo com a linha de referência tirada do chão e posta no meio da saída.
+  Os slots, a calha, a linha de nível e de retenção de pico, os uniforms
+  protegidos e a rampa de cor são todos os do `eqbars`; a única mudança é
+  medir a distância do centro em vez de medir do fim, então uma barra de
+  altura `level` cresce `level/2` para cima e `level/2` para baixo e
+  cobre exatamente as linhas que cobria antes — a área acesa não muda, e
+  é por isso que "diferente das barras" tem que ser uma afirmação sobre
+  onde os pixels ficam e não sobre quantos são.
+- Um `abs()` sobre o meio substitui os dois lados, então `y` e `1 - y`
+  produzem o mesmo número e as duas metades concordam por construção em
+  vez de desenhar a forma duas vezes. O marcador de pico cavalca as duas
+  pontas a partir do mesmo ramo; `uPeakSize` continua sendo uma altura de
+  tela, então é dobrado onde `d` avança em dobro dessa taxa. O custo não
+  muda: uma linha de ~256 bytes do analisador.
+- Verificado em `rendertest`: a primeira e a última linha ficam ambas
+  limpas — a afirmação que a separa das barras, cujo chão mostra um run
+  por slot — a linha do meio mostra os **64** runs e ainda alcança as
+  duas bordas laterais, e todas as **832** colunas acesas são simétricas
+  em relação ao meio com erro máximo de **0** linhas e ficam num run
+  único.
+
 #### `videomixer.h` / `videomixer.cpp` / `spectrumanalyzer.h` / `spectrumanalyzer.cpp`
 - **Redesenho na taxa da display**: o timer de repaint do mixer estava
   fixo em 33 ms (~30 fps), o que limitava o visualizador em 30 fps mesmo
@@ -321,6 +344,20 @@ Fork: https://github.com/brdelphus/lararadio
   barras para baixo e volta a acender 16.5 kHz em escala máxima.
 
 ### Alterado
+
+#### `shaders/eqbars.frag` / `eqmountain.frag` / `eqside.frag` / `eqdots.frag` / `eqmirrorbars.frag`
+- **A rampa de cor do EQ agora vai do verde na base, pelo amarelo, até
+  o vermelho na ponta.** Estava ao contrário: `barColor(0)` é verde e
+  cada um desses cinco passava `0` na *ponta*, então o chão de uma barra
+  saía vermelho e a ponta verde. Foi também por isso que o comentário do
+  próprio `eqbars` — "Green at the base, through yellow, to red at the
+  tip" — tinha deixado de descrever o código dele; agora descreve. Mudou
+  só a direção em que a rampa é lida, então as cores na tela e todas as
+  contagens de pixels do `rendertest` continuam iguais. `eqcircle` e
+  `eqradialmirror` não têm gradiente de base para ponta para inverter —
+  eles pintam o raio inteiro pelo nível, verde quando baixo e vermelho
+  quando alto — então ficaram como estavam e agora leem do mesmo lado
+  das barras em vez do oposto.
 
 #### `mainwindow.ui` / `resources.qrc` / `deploy/linux/` / `.github/workflows/appimage.yml`
 - **Novo ícone do app**: a janela principal agora define `windowIcon`

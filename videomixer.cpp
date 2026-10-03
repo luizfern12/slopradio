@@ -267,6 +267,11 @@ const QList<VideoMixer::EqVisualizer> &VideoMixer::eqVisualizers()
         { QStringLiteral("bars"),
           QT_TRANSLATE_NOOP("VideoMixer", "Barras"),
           QStringLiteral(":/shaders/eqbars.frag") },
+        // Straight after the bars it derives from, so the two read as one
+        // option with a variant rather than as unrelated effects.
+        { QStringLiteral("mirrorbars"),
+          QT_TRANSLATE_NOOP("VideoMixer", "Barras espelhadas"),
+          QStringLiteral(":/shaders/eqmirrorbars.frag") },
         { QStringLiteral("circle"),
           QT_TRANSLATE_NOOP("VideoMixer", "Círculo"),
           QStringLiteral(":/shaders/eqcircle.frag") },

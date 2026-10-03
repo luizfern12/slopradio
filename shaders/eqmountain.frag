@@ -93,8 +93,8 @@ void main()
     float tip = 1.0 - level;
 
     if (y >= tip) {
-        // 0 at the tip of the silhouette, 1 at its foot.
-        float t = level > 0.001 ? (y - tip) / level : 0.0;
+        // 0 at the foot of the silhouette, 1 at its tip.
+        float t = level > 0.001 ? (1.0 - y) / level : 0.0;
         gl_FragColor = vec4(barColor(t), 1.0);
     } else if (peak > 0.002 && y >= 1.0 - peak && y < 1.0 - peak + uPeakSize) {
         gl_FragColor = vec4(0.85, 0.87, 0.90, 1.0);

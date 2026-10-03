@@ -51,8 +51,8 @@ void main()
     // silent graph black: without it x <= level is true at x = 0 even when the
     // band has nothing, and the left edge would stay lit through silence.
     if (level > 0.001 && x <= level) {
-        // 0 at the tip of the bar, 1 at its foot, matching eqbars.frag.
-        gl_FragColor = vec4(barColor(1.0 - x / level), 1.0);
+        // 0 at the foot of the bar, 1 at its tip, matching eqbars.frag.
+        gl_FragColor = vec4(barColor(x / level), 1.0);
         return;
     }
     if (peak > 0.002 && x >= peak && x < peak + uPeakSize) {

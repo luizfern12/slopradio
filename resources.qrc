@@ -52,6 +52,7 @@
         <file>shaders/cube3d.frag</file>
         <file>shaders/rotate3d.frag</file>
         <file>shaders/eqbars.frag</file>
+        <file>shaders/eqmirrorbars.frag</file>
         <file>shaders/eqcircle.frag</file>
         <file>shaders/eqmountain.frag</file>
         <file>shaders/eqside.frag</file>
