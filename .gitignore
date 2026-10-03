@@ -71,3 +71,8 @@ packing/
 
 CMakeLists.txt.user
 .build_number.txt
+
+# Local material, never committed: the sample media used for manual checks
+# and any screenshot dropped in the repo root while debugging.
+SAMPLE_MEDIA/
+screen.png
