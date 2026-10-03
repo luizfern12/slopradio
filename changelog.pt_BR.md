@@ -187,12 +187,23 @@ Fork: https://github.com/brdelphus/lararadio
   `eqVisualizers()`, um shader de fragmento e uma entrada em
   `resources.qrc` — mais nada.
   - **Montanha** — as barras costuradas em um único contorno. Cada
-    coluna usa a reta entre as duas bandas entre as quais ela está, então
-    o gráfico vira uma forma só em vez de um pente. A borda direita é
-    limitada em vez de contornar, porque `mod()` alcançaria de volta até
-    a banda 0 nas últimas colunas e derrubaria uma escada em x = 1. Ela
-    não tem uniform de espaçamento nenhum: a ausência dele é toda a
-    diferença em relação ao `eqbars`.
+    coluna usa uma curva Catmull-Rom através das quatro bandas vizinhas
+    em vez da reta entre duas delas, então slots consecutivos se
+    encontram com a mesma inclinação em vez de um canto — um canto por
+    slot é o que faz a junção reta parecer poligonal não importa quantas
+    colunas se desenhem. A curva ainda passa por exatamente o valor que
+    cada banda reporta, então nada entre as bandas é inventado, e ela é
+    limitada a `[0, 1]` depois, porque um cúbico ultrapassa os limites e
+    um nível abaixo de zero é uma ponta acima da linha de base — um
+    buraco no contorno. Os valores das bandas ficam no meio do próprio
+    slot, no mesmo lugar em que o `eqbars` os coloca, o que deixa meio
+    slot de margem em cada extremidade; essas margens mantêm o nível da
+    banda mais próxima, então o contorno alcança as duas bordas da tela
+    com o nível que a linha realmente reporta. A amostragem é limitada
+    em vez de contornar, porque `mod()` alcançaria de volta até a banda
+    0 nas últimas colunas e derrubaria uma escada em x = 1. Ela não tem
+    uniform de espaçamento nenhum: a ausência dele é toda a diferença
+    em relação ao `eqbars`.
   - **Lateral** — a mesma linha girada um quarto de volta. A frequência
     sobe pela tela, o nível sai da borda esquerda e a banda 0 fica no
     chão para que a leitura seja de baixo para cima, do jeito que as
@@ -219,9 +230,12 @@ Fork: https://github.com/brdelphus/lararadio
   `eqbars` e `eqcircle`, que já declaravam os quatro.
 - Os quatro são verificados em `rendertest`, por propriedade e não por
   contagem de pixels: a linha de base da montanha tem **1** run onde as
-  barras mostram 64, e a ponta dela anda no máximo **7** linhas entre
+  barras mostram 64, a ponta dela anda no máximo **8** linhas entre
   colunas vizinhas (limite 90, onde as barras saltam uma altura de barra
-  inteira); a lateral dá um run por linha encostado na borda esquerda e
+  inteira), e ela se desvia da reta que liga suas bandas em **36 de 63**
+  slots no deslocamento que melhor se encaixa — uma junção reta encontra
+  algum deslocamento com **0**; a lateral dá um run por linha encostado
+  na borda esquerda e
   **64** runs num corte vertical — exatamente o transposto das barras;
   os pontos fatiam uma coluna em **17** segmentos de LED onde uma barra
   dá 1; o espelho radial mantém o hub limpo e centraliza os 64 raios no

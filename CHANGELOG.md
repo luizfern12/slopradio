@@ -177,12 +177,22 @@ Fork: https://github.com/brdelphus/lararadio
   refactor promised: a row in `eqVisualizers()`, a fragment shader and a
   `resources.qrc` line, and nothing else.
   - **Montanha** — the bars stitched into a single silhouette. Each
-    column takes the straight line between the two bands it lies
-    between, so the graph is one shape instead of a comb. The right
-    edge clamps rather than wrapping, because `mod()` would reach back
-    to band 0 for the last columns and drop a cliff at x = 1. It has no
-    gutter uniform at all: the absence of one is the whole difference
-    from `eqbars`.
+    column takes a Catmull-Rom curve through its four neighbouring
+    bands rather than the straight line between two of them, so
+    consecutive slots meet with a shared slope instead of a corner —
+    one corner per slot is what makes a straight-line join read as
+    polygonal however many columns are drawn. The curve still passes
+    through every band's reported value, so nothing between the bands
+    is invented, and it is clamped to `[0, 1]` afterwards because a
+    cubic overshoots and a level below zero is a tip above the
+    baseline — a hole in the silhouette. Band values sit in the middle
+    of their own slot, the same place `eqbars` puts them, which leaves
+    half a slot of margin at each end; those margins hold the nearest
+    band's level, so the silhouette reaches both screen edges at the
+    level the row actually reports. Sampling clamps rather than
+    wrapping, because `mod()` would reach back to band 0 for the last
+    columns and drop a cliff at x = 1. It has no gutter uniform at
+    all: the absence of one is the whole difference from `eqbars`.
   - **Lateral** — the same row rotated a quarter turn. Frequency runs up
     the screen, level extends from the left edge, and band 0 sits on the
     bottom so it reads bottom-to-top the way the bars read
@@ -207,9 +217,12 @@ Fork: https://github.com/brdelphus/lararadio
   than handed a -1 location. Behaviour is unchanged for `eqbars` and
   `eqcircle`, which already declared all four.
 - All four are asserted in `rendertest`, on properties rather than pixel
-  counts: mountain's baseline is **1** run where the bars show 64, and
-  its tip steps at most **7** rows between neighbouring columns (limit
-  90, where the bars jump a full bar height); side gives one run per row
+  counts: mountain's baseline is **1** run where the bars show 64, its
+  tip steps at most **8** rows between neighbouring columns (limit 90,
+  where the bars jump a full bar height), and it bows off the straight
+  chord joining its bands in **36 of 63** slots at the offset that fits
+  it best — a straight-line join finds an offset with **0**; side gives
+  one run per row
   flush against the left edge and **64** runs down a vertical cut —
   exactly the transpose of the bars; dots chops a column into **17** LED
   segments where a bar gives 1; radialmirror keeps the hub clear and

@@ -3,9 +3,9 @@
 //
 // Same one-row input as eqbars.frag — a kBands x 1 RGBA image with the bar
 // height in R and the peak-hold height in G — but the slots are stitched
-// together: each column takes the straight line between the two bands it lies
-// between, so the graph comes out as one silhouette instead of a comb of
-// separate bars.
+// together: each column takes a curve through its neighbouring bands instead
+// of the straight line between two of them, so the graph comes out as one
+// silhouette without a corner at every slot boundary.
 //
 // There is deliberately no uGap here. A gutter between columns would cut the
 // silhouette back into pieces, and "no gutter" is the entire difference
@@ -30,22 +30,62 @@ vec3 barColor(float t)
                    : mix(mid, high, (t - 0.5) * 2.0);
 }
 
+// One band's sample, clamped instead of wrapped. mod() would reach back to
+// band 0 past the end of the row and drop a cliff at x = 1, which is exactly
+// the discontinuity a silhouette is meant not to have.
+vec4 bandAt(float k)
+{
+    return texture2D(from, vec2((clamp(k, 0.0, uBands - 1.0) + 0.5) / uBands, 0.5));
+}
+
+// Uniform Catmull-Rom: the cubic joining p1 to p2, shaped by the sample on
+// either side of them. It passes exactly through p1 and p2 — so every band's
+// reported height stays true — and leaves p2 with the same slope the next
+// segment starts with, so consecutive slots meet in a curve rather than a
+// corner. That corner, once per slot, is what makes a straight-line join read
+// as polygonal no matter how many columns are drawn.
+float curve(float p0, float p1, float p2, float p3, float t)
+{
+    float t2 = t * t;
+    float t3 = t2 * t;
+    return 0.5 * ((2.0 * p1)
+                  + (-p0 + p2) * t
+                  + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
+                  + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3);
+}
+
 void main()
 {
-    // The two bands this column lies between, and how far across the step it
-    // sits. The right edge clamps rather than wraps: mod() would reach back to
-    // band 0 for the last columns and drop a cliff at x = 1, which is exactly
-    // the discontinuity the silhouette is meant not to have.
-    float slot = v_texCoord.x * uBands;
-    float i0 = clamp(floor(slot), 0.0, uBands - 1.0);
-    float i1 = min(i0 + 1.0, uBands - 1.0);
-    float f = fract(slot);
+    // Band-space position, with each band's value sitting in the middle of its
+    // own slot — the same place eqbars.frag puts it, so switching modes doesn't
+    // slide the spectrum sideways. Both ends are floored through bandAt(), so
+    // the fetches below are in uniform control flow whatever pos turns out to
+    // be; only the arithmetic is branched.
+    float pos = v_texCoord.x * uBands - 0.5;
+    float i = floor(pos);
+    float f = pos - i;
 
-    vec4 s0 = texture2D(from, vec2((i0 + 0.5) / uBands, 0.5));
-    vec4 s1 = texture2D(from, vec2((i1 + 0.5) / uBands, 0.5));
+    vec4 sPrev = bandAt(i - 1.0);
+    vec4 s0 = bandAt(i);
+    vec4 s1 = bandAt(i + 1.0);
+    vec4 s2 = bandAt(i + 2.0);
 
-    float level = mix(s0.r, s1.r, f);
-    float peak = mix(s0.g, s1.g, f);
+    // Half a slot of margin past either end, where there is no band on the far
+    // side to lean on: hold the nearest band's height. That also pins the
+    // silhouette to both screen edges at the level the row actually reports,
+    // instead of tapering off past the last sample.
+    bool margin = pos < 0.0 || pos >= uBands - 1.0;
+    vec2 levelPeak = margin
+        ? s0.rg
+        : vec2(curve(sPrev.r, s0.r, s1.r, s2.r, f),
+               curve(sPrev.g, s0.g, s1.g, s2.g, f));
+
+    // A cubic can overshoot: a sharp fall pulls the curve below zero in the
+    // valley, and a level below zero is a tip above the baseline — a hole
+    // punched through the silhouette. Clamping keeps the shape solid and
+    // inside the screen.
+    float level = clamp(levelPeak.x, 0.0, 1.0);
+    float peak = clamp(levelPeak.y, 0.0, 1.0);
 
     // v_texCoord.y runs 0 at the top of the screen to 1 at the bottom, so the
     // silhouette stands on v = 1 exactly like the bars do.
