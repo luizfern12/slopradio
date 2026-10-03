@@ -53,6 +53,7 @@ ConfigDialog::ConfigDialog(QWidget *parent)
     // audio-only track.
     ui->video_eqvisualizer->addItem(tr("Desligado"), QStringLiteral("off"));
     ui->video_eqvisualizer->addItem(tr("Barras"), QStringLiteral("bars"));
+    ui->video_eqvisualizer->addItem(tr("Círculo"), QStringLiteral("circle"));
     const QString eqMode = settings.value("video/eqvisualizer", QStringLiteral("off")).toString();
     const int eidx = ui->video_eqvisualizer->findData(eqMode);
     ui->video_eqvisualizer->setCurrentIndex(eidx >= 0 ? eidx : 0);

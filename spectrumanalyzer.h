@@ -22,15 +22,24 @@ class QScreen;
 //
 // What leaves this class is deliberately tiny: a kBands x 1 RGBA image with
 // the bar height in R and the peak-hold height in G. VideoMixer uploads that
-// one row per frame (~128 bytes) and lets the fragment shader draw the bars,
+// one row per frame (~256 bytes) and lets the fragment shader draw the bars,
 // so nothing about the rendering lives on the CPU.
+//
+// Two stages, each with exactly one owner:
+//
+//   analyse()   -> m_level / m_peak        the meter's own dynamics
+//   takeFrame() -> m_levelSmoothed / ...   what actually gets painted
+//
+// Keeping the display filter out of analyse() matters: they run on different
+// threads at different rates (one FFT per audio buffer, one row per repaint),
+// and a filter in both would run twice as often as its time constant says.
 class SpectrumAnalyzer : public QObject
 {
     Q_OBJECT
 
 public:
     static constexpr int kFftSize = 1024;   // must be a power of two
-    static constexpr int kBands = 32;       // bar slots across the output
+    static constexpr int kBands = 64;       // bar slots across the output
 
     // Lowest frequency plotted. Nothing musical lives below this, and bins below
     // it would only widen the unused gap on the left of the graph.
@@ -57,6 +66,13 @@ public:
     static constexpr float kLevelFallPerSecond = 1.8f;
     static constexpr float kPeakFallPerSecond = 0.5f;
 
+    // Display filter time constant. Applied once per painted frame in
+    // takeFrame(), and only on the way down: the bar must jump the instant the
+    // music does, so attack is not filtered at all. This is long enough to
+    // spread the ~26 ms steps of an MP3 decode buffer across a repaint, and
+    // short enough that a falling bar is not visibly trailing its own meter.
+    static constexpr float kSmoothingSeconds = 0.020f;
+
     struct Frame
     {
         QImage row;                        // kBands x 1 RGBA8888
@@ -73,7 +89,13 @@ public:
     // worth drawing.
     bool hasData() const;
 
-    // Latest band levels plus their sequence number. Cheap: one 128-byte
+    // How many transforms have actually run. The pacing gate in feed() decides
+    // this, and it is otherwise invisible: too many means burning CPU on frames
+    // nobody paints, too few means a graph that crawls. Exposed so the gate can
+    // be checked directly instead of by timing a loop.
+    quint64 analysisCount() const;
+
+    // Latest band levels plus their sequence number. Cheap: one 256-byte
     // copy under a lock.
     Frame takeFrame();
 
@@ -104,37 +126,27 @@ private:
     std::vector<int> m_bandLast;
     int m_bandSampleRate = 0;
 
-    // Displayed bar height and peak marker, both 0..1. Held on the CPU
-    // deliberately: the fragment shader has no memory between frames, and
-    // reading back from the GPU to decay them would cost more than the FFT.
+    // Metered bar height and peak marker, both 0..1, with instant attack and a
+    // timed release. Written only by analyse(). Held on the CPU deliberately:
+    // the fragment shader has no memory between frames, and reading back from
+    // the GPU to decay them would cost more than the FFT.
     std::vector<float> m_level;
     std::vector<float> m_peak;
 
-    // Smoothed copies, updated on the same cadence as m_row. These are what
-    // takeFrame() returns, to hide chunkiness when buffers arrive less often
-    // than the display repaints.
+    // m_level / m_peak after the display filter — what the shader is handed.
+    // Written only by takeFrame(), at repaint cadence, so one filter
+    // application means one painted frame.
     std::vector<float> m_levelSmoothed;
     std::vector<float> m_peakSmoothed;
 
-    // Last analysis targets (raw levels from most recent FFT), plus timestamps
-    // so takeFrame() can continue to decay/smooth between analyses.
-    std::vector<float> m_levelTarget;
-    std::vector<float> m_peakTarget;
-    qint64 m_lastAnalysisMs = 0;  // elapsed time of last analyse() run
-    qint64 m_lastTakeMs = 0;      // elapsed time of last takeFrame() call
+    qint64 m_lastTakeMs = -1;     // elapsed time of last takeFrame() call (-1: none yet)
 
     QImage m_row;
     QElapsedTimer m_updateTimer;
     quint64 m_seq = 0;         // monotonic, so a reset is visible to the renderer
+    quint64 m_analyses = 0;    // transforms actually run; see analysisCount()
     bool m_hasData = false;
     int m_sampleRate = 44100;   // from the buffer; needed to map Hz -> bins
-
-    // Exponential smoothing factor for bar/peak decay applied per analysis
-    // step. This keeps motion smooth even when new FFT frames arrive at
-    // irregular or sub-display-rate intervals.
-    float m_smoothAlpha = 0.25f; // 25% of new value per frame on average
-
-
 
     // Written by the GUI thread (setFrameIntervalMs, reset) and read by the
     // multimedia thread in feed(), so these must be atomic.

@@ -41,7 +41,8 @@ const GLfloat kQuad[16] = {
 
 const char *kDefaultFrag = ":/shaders/crossfade.frag";
 const char *kDefaultVert = ":/shaders/fullscreen.vert";
-const char *kEqFrag = ":/shaders/eqbars.frag";
+const char *kEqBarsFrag = ":/shaders/eqbars.frag";
+const char *kEqCircleFrag = ":/shaders/eqcircle.frag";
 
 // YUV → RGB converter (NV12 luma+interleaved CbCr, or YUV420P planar)
 // rendered into a per-deck RGBA FBO. The YUV planes are uploaded with the
@@ -187,7 +188,8 @@ void VideoMixer::refreshIncomingDeck()
         m_incoming = 1;
     else if (m_decks[1] && m_decks[1]->isVideoActive() && !(m_decks[0] && m_decks[0]->isVideoActive()))
         m_incoming = 2;
-    else if (!m_decks[0]->isVideoActive() && !m_decks[1]->isVideoActive())
+    else if ((!m_decks[0] || !m_decks[0]->isVideoActive())
+             && (!m_decks[1] || !m_decks[1]->isVideoActive()))
         m_incoming = 1;
 }
 
@@ -261,12 +263,18 @@ VideoMixer::EqMode VideoMixer::modeFromString(const QString &value)
 {
     if (value == QLatin1String("bars"))
         return EqMode::Bars;
+    if (value == QLatin1String("circle"))
+        return EqMode::Circle;
     return EqMode::Off;
 }
 
 QString VideoMixer::modeToString(EqMode mode)
 {
-    return mode == EqMode::Bars ? QStringLiteral("bars") : QStringLiteral("off");
+    if (mode == EqMode::Bars)
+        return QStringLiteral("bars");
+    if (mode == EqMode::Circle)
+        return QStringLiteral("circle");
+    return QStringLiteral("off");
 }
 
 void VideoMixer::setSpectrumAnalyzer(SpectrumAnalyzer *analyzer)
@@ -795,6 +803,10 @@ void VideoMixer::renderEq()
                                  float(SpectrumAnalyzer::kBands));
     m_eqProgram->setUniformValue(m_eqProgram->uniformLocation("uGap"), 0.18f);
     m_eqProgram->setUniformValue(m_eqProgram->uniformLocation("uPeakSize"), 0.008f);
+    // Circular mode only; the bars shader has no such uniform.
+    const int ratioLoc = m_eqProgram->uniformLocation("uRatio");
+    if (ratioLoc >= 0)
+        m_eqProgram->setUniformValue(ratioLoc, m_ratio);
 
     if (m_vao && m_vao->isCreated()) {
         m_vao->bind();
@@ -817,15 +829,19 @@ void VideoMixer::renderEq()
 
 bool VideoMixer::ensureEqProgram()
 {
-    if (m_eqProgram)
+    const char *wantFrag = (m_eqMode == EqMode::Circle) ? kEqCircleFrag
+                                                        : kEqBarsFrag;
+
+    // Already linked for this mode; switching modes relinks it here.
+    if (m_eqProgram && m_eqFragPath == QLatin1String(wantFrag))
         return true;
     // A broken shader must not be retried every frame.
-    if (m_eqFailed)
+    if (m_eqFailedFrag == QLatin1String(wantFrag))
         return false;
 
-    const QString frag = readSource(QLatin1String(kEqFrag));
+    const QString frag = readSource(QLatin1String(wantFrag));
     if (frag.isEmpty()) {
-        m_eqFailed = true;
+        m_eqFailedFrag = QLatin1String(wantFrag);
         return false;
     }
 
@@ -837,11 +853,12 @@ bool VideoMixer::ensureEqProgram()
         || !program->addShaderFromSourceCode(QOpenGLShader::Fragment, frag)
         || !program->link()) {
         qWarning() << "VideoMixer: EQ visualizer shader failed to build";
-        m_eqFailed = true;
+        m_eqFailedFrag = QLatin1String(wantFrag);
         return false;
     }
 
     m_eqProgram = std::move(program);
+    m_eqFragPath = QLatin1String(wantFrag);
     return true;
 }
 
@@ -933,7 +950,7 @@ void VideoMixer::renderScene()
     // Audio-only material: show the EQ visualizer instead of an effect running
     // over black. Only outside a transition, so fromHeld (which keeps the
     // outgoing deck's last frame on screen) is never blanked out mid-crossfade.
-    if (m_eqMode == EqMode::Bars
+    if ((m_eqMode == EqMode::Bars || m_eqMode == EqMode::Circle)
         && !fromActive && !toActive && !m_inTransition && m_analyzer
         && m_analyzer->hasData()) {
         uploadEqRow();

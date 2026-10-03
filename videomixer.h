@@ -70,6 +70,7 @@ public:
     enum class EqMode {
         Off,
         Bars,
+        Circle,
     };
     static EqMode modeFromString(const QString &value);
     static QString modeToString(EqMode mode);
@@ -156,7 +157,10 @@ private:
     std::unique_ptr<QOpenGLTexture> m_eqTex;
     std::unique_ptr<QOpenGLShaderProgram> m_eqProgram;
     quint64 m_eqLastSeq = 0;    // last frame uploaded, 0 = nothing yet
-    bool m_eqFailed = false;
+    // Fragment path m_eqProgram was linked from, so switching modes relinks,
+    // and the per-path failures that were reported once and never retried.
+    QString m_eqFragPath;
+    QString m_eqFailedFrag;
 
     qint64 m_lastFrameStart[2] = {-1, -1};
     QVideoFrame m_latest[2];

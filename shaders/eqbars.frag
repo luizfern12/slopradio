@@ -3,7 +3,7 @@
 //
 // The CPU only produces one tiny row per frame: a kBands x 1 RGBA image with
 // the bar height in red and the peak-hold height in green. Everything visual
-// happens here, so the per-frame upload is ~128 bytes and the bars, the gaps
+// happens here, so the per-frame upload is ~256 bytes and the bars, the gaps
 // between them and the colour ramp are all free.
 #ifdef GL_ES
 precision mediump float;

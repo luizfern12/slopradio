@@ -16,10 +16,7 @@ SpectrumAnalyzer::SpectrumAnalyzer(QObject *parent)
     m_peak.assign(kBands, 0.0f);
     m_levelSmoothed.assign(kBands, 0.0f);
     m_peakSmoothed.assign(kBands, 0.0f);
-    m_levelTarget.assign(kBands, 0.0f);
-    m_peakTarget.assign(kBands, 0.0f);
-    m_lastAnalysisMs = 0;
-    m_lastTakeMs = 0;
+    m_lastTakeMs = -1;
     m_bandFirst.assign(kBands, -1);
     m_bandLast.assign(kBands, -1);
 
@@ -34,9 +31,12 @@ SpectrumAnalyzer::SpectrumAnalyzer(QObject *parent)
     m_row = QImage(kBands, 1, QImage::Format_RGBA8888);
     m_row.fill(qRgba(0, 0, 0, 255));
 
+    // Time origin for feed()'s pacing gate and takeFrame()'s per-frame dt.
+    // Without start(), elapsed() reports a huge negative number and the gate
+    // can never measure a gap.
+    m_updateTimer.start();
+
     m_frameIntervalMs.store(frameIntervalMs(nullptr));  // follow display refresh rate
-
-
 }
 
 int SpectrumAnalyzer::frameIntervalMs(const QScreen *screen)
@@ -68,8 +68,6 @@ void SpectrumAnalyzer::reset()
     std::fill(m_peak.begin(), m_peak.end(), 0.0f);
     std::fill(m_levelSmoothed.begin(), m_levelSmoothed.end(), 0.0f);
     std::fill(m_peakSmoothed.begin(), m_peakSmoothed.end(), 0.0f);
-    std::fill(m_levelTarget.begin(), m_levelTarget.end(), 0.0f);
-    std::fill(m_peakTarget.begin(), m_peakTarget.end(), 0.0f);
     m_row.fill(qRgba(0, 0, 0, 255));
     ++m_seq;          // let the renderer know the bars were cleared
     m_hasData = false;
@@ -82,6 +80,12 @@ bool SpectrumAnalyzer::hasData() const
 {
     QMutexLocker lock(&m_mutex);
     return m_hasData;
+}
+
+quint64 SpectrumAnalyzer::analysisCount() const
+{
+    QMutexLocker lock(&m_mutex);
+    return m_analyses;
 }
 
 void SpectrumAnalyzer::feed(const QAudioBuffer &buffer)
@@ -102,13 +106,12 @@ void SpectrumAnalyzer::feed(const QAudioBuffer &buffer)
     // right away, and the first one after reset() so the bars come back.
     const bool forced = m_forceNext.exchange(false, std::memory_order_relaxed);
     const qint64 sinceMs = nowMs - m_sinceAnalysisMs;
-    // Don't hard-throttle for 60fps testing: analyse every buffer we get
-    // but still compute dt from elapsed time.
-    if (!forced && sinceMs < 0) {
-        m_sinceAnalysisMs = nowMs;
-    } else if (!forced) {
-        // allow to pass; we still do the analysis each buffer for smoothness
-    }
+
+    // One FFT per displayed frame, decided by the wall clock. Anything arriving
+    // inside the interval is dropped before the transform, so a callback that
+    // outruns the display cannot burn CPU for updates nobody can paint.
+    if (!forced && sinceMs < intervalMs)
+        return;
     m_sinceAnalysisMs = nowMs;
 
     // After a pause the real gap can be arbitrarily long; clamping keeps one
@@ -184,7 +187,7 @@ void SpectrumAnalyzer::fft(float *re, float *im) const
             for (int k = 0; k < len / 2; ++k) {
                 const float ur = re[i + k],           ui = im[i + k];
                 const float vr = re[i + k + len / 2] * cr - im[i + k + len / 2] * ci;
-                const float vi = re[i + k + len / 2] * ci + re[i + k + len / 2] * cr;
+                const float vi = re[i + k + len / 2] * ci + im[i + k + len / 2] * cr;
                 re[i + k] = ur + vr;         im[i + k] = ui + vi;
                 re[i + k + len / 2] = ur - vr; im[i + k + len / 2] = ui - vi;
                 const float ncr = cr * wr - ci * wi;
@@ -260,19 +263,12 @@ void SpectrumAnalyzer::analyse(float dtSeconds)
     const float levelFall = kLevelFallPerSecond * dtSeconds;
     const float peakFall = kPeakFallPerSecond * dtSeconds;
 
-    uchar *line = m_row.scanLine(0);
     for (int b = 0; b < kBands; ++b) {
         if (m_bandFirst[b] < 0) {
             // No bins left for this slot once the earlier bars took theirs, so
             // keep it dark rather than repeating the top band.
             m_level[b] = 0.0f;
             m_peak[b] = 0.0f;
-            m_levelTarget[b] = 0.0f;
-            m_peakTarget[b] = 0.0f;
-            line[b * 4 + 0] = 0;
-            line[b * 4 + 1] = 0;
-            line[b * 4 + 2] = 0;
-            line[b * 4 + 3] = 255;
             continue;
         }
 
@@ -285,34 +281,16 @@ void SpectrumAnalyzer::analyse(float dtSeconds)
         const float db = 20.0f * std::log10(std::max(mag, 1e-7f));
         const float t = std::clamp((db - kFloorDb) / (kCeilDb - kFloorDb), 0.0f, 1.0f);
 
-        // Instant attack, gradual release on the targets
-        float lvl = t > m_level[b] ? t : std::max(t, m_level[b] - levelFall);
-        float pk = t > m_peak[b] ? t : std::max(t, m_peak[b] - peakFall);
-        m_level[b] = lvl;
-        m_peak[b] = pk;
-        m_levelTarget[b] = lvl;
-        m_peakTarget[b] = pk;
-
-        // Smoothing helps hide the ~26 ms chunkiness of MP3 decode buffers
-        // when painting at 60 fps.
-        if (m_levelSmoothed.size() != size_t(kBands)) {
-            m_levelSmoothed.assign(kBands, 0.0f);
-            m_peakSmoothed.assign(kBands, 0.0f);
-        }
-        m_levelSmoothed[b] = m_smoothAlpha * lvl + (1.0f - m_smoothAlpha) * m_levelSmoothed[b];
-        m_peakSmoothed[b] = m_smoothAlpha * pk + (1.0f - m_smoothAlpha) * m_peakSmoothed[b];
-
-        const float dlv = std::clamp(m_levelSmoothed[b], 0.0f, 1.0f);
-        const float dpk = std::clamp(m_peakSmoothed[b], 0.0f, 1.0f);
-        line[b * 4 + 0] = uchar(dlv * 255.0f + 0.5f);
-        line[b * 4 + 1] = uchar(dpk * 255.0f + 0.5f);
-        line[b * 4 + 2] = 0;
-        line[b * 4 + 3] = 255;
+        // Instant attack, timed release: the meter itself. It deliberately
+        // touches neither m_row nor m_seq — this runs once per audio buffer
+        // while the row is repainted per frame, and a filter or a row write in
+        // both places would mean two clocks fighting over the same state.
+        m_level[b] = t > m_level[b] ? t : std::max(t, m_level[b] - levelFall);
+        m_peak[b] = t > m_peak[b] ? t : std::max(t, m_peak[b] - peakFall);
     }
 
-    ++m_seq;
     m_hasData = true;
-    m_lastAnalysisMs = m_updateTimer.elapsed();
+    ++m_analyses;
 }
 
 SpectrumAnalyzer::Frame SpectrumAnalyzer::takeFrame()
@@ -324,38 +302,34 @@ SpectrumAnalyzer::Frame SpectrumAnalyzer::takeFrame()
         return f;
 
     const qint64 now = m_updateTimer.elapsed();
-    if (m_lastTakeMs == 0)
-        m_lastTakeMs = now;
-    qint64 dtMs = now - m_lastTakeMs;
-    if (m_lastTakeMs == 0 || dtMs < 0)
+    qint64 dtMs = (m_lastTakeMs < 0) ? 16 : now - m_lastTakeMs;
+    if (dtMs < 0)
         dtMs = 16;
     m_lastTakeMs = now;
     const float dtSeconds = std::clamp(float(dtMs) / 1000.0f, 0.0f, 0.1f);
 
-    const float levelFall = kLevelFallPerSecond * dtSeconds;
-    const float peakFall = kPeakFallPerSecond * dtSeconds;
-
-    if (m_levelSmoothed.size() != size_t(kBands)) {
-        m_levelSmoothed.assign(kBands, 0.0f);
-        m_peakSmoothed.assign(kBands, 0.0f);
-        m_levelTarget.assign(kBands, 0.0f);
-        m_peakTarget.assign(kBands, 0.0f);
-    }
-    if (m_levelTarget.size() != size_t(kBands)) {
-        m_levelTarget.assign(kBands, 0.0f);
-        m_peakTarget.assign(kBands, 0.0f);
-    }
+    // One filter step per painted frame, so kSmoothingSeconds means what it
+    // says however many audio buffers landed in between. Expressed as a time
+    // constant rather than a per-call fraction: a fixed alpha would make the
+    // result depend on the repaint rate.
+    const float k = 1.0f - std::exp(-dtSeconds / kSmoothingSeconds);
 
     uchar *line = m_row.scanLine(0);
     for (int b = 0; b < kBands; ++b) {
-        const float t = m_levelTarget[b];
-        const float pt = m_peakTarget[b];
-        float lvl = t > m_level[b] ? t : std::max(t, m_level[b] - levelFall);
-        float pk = pt > m_peak[b] ? pt : std::max(pt, m_peak[b] - peakFall);
-        m_level[b] = lvl;
-        m_peak[b] = pk;
-        m_levelSmoothed[b] = m_smoothAlpha * lvl + (1.0f - m_smoothAlpha) * m_levelSmoothed[b];
-        m_peakSmoothed[b] = m_smoothAlpha * pk + (1.0f - m_smoothAlpha) * m_peakSmoothed[b];
+        const float t = m_level[b];
+        const float pt = m_peak[b];
+
+        // Attack is not filtered — a bar has to jump when the music does, and
+        // any lag there reads as the graph being asleep. Only the fall is
+        // smoothed, which is where the ~26 ms steps of a decode buffer would
+        // otherwise show as judder.
+        m_levelSmoothed[b] = (t > m_levelSmoothed[b])
+                                ? t
+                                : m_levelSmoothed[b] + (t - m_levelSmoothed[b]) * k;
+        m_peakSmoothed[b] = (pt > m_peakSmoothed[b])
+                                ? pt
+                                : m_peakSmoothed[b] + (pt - m_peakSmoothed[b]) * k;
+
         const float dlv = std::clamp(m_levelSmoothed[b], 0.0f, 1.0f);
         const float dpk = std::clamp(m_peakSmoothed[b], 0.0f, 1.0f);
         line[b * 4 + 0] = uchar(dlv * 255.0f + 0.5f);

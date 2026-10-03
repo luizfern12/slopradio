@@ -115,7 +115,7 @@ Fork: https://github.com/brdelphus/lararadio
   `calculateRMS()` — os mesmos buffers que já movem os VU meters,
   então não há um segundo ponto de escuta no caminho do áudio.
   Nenhuma dependência nova.
-- **32 barras, em escala logarítmica onde a transformação permite**:
+- **64 barras, em escala logarítmica onde a transformação permite**:
   as bordas das bandas são espaçadas em log a partir de 30 Hz, depois
   convertidas para bins da FFT (`bin = Hz * kFftSize / taxa`) e cada
   barra recebe pelo menos um bin. Sem esse último passo as bandas mais
@@ -125,12 +125,21 @@ Fork: https://github.com/brdelphus/lararadio
   num transiente e descem suavemente, e um marcador de pico fica
   pendurado alguns segundos acima delas. Os níveis são escalados de
   -72 a -12 dB.
+- **Um filtro, um dono**: `analyse()` agora só calcula o medidor (ataque
+  instantâneo, queda cronometrada) enquanto `takeFrame()` só aplica o
+  filtro de display e escreve a linha. Antes os dois suavizavam *e* os
+  dois escreviam `m_row`, em relógios separados — um filtro rodando ~98
+  vezes por segundo em vez de uma vez por repaint, mais duas threads
+  disputando os mesmos pixels. O filtro agora é uma constante de tempo
+  de 20 ms aplicada uma vez por quadro pintado e só na descida, então o
+  ataque não é filtrado. O tempo de um transiente até 90% da escala
+  total caiu de 64 ms (5 quadros pintados) para 32 ms (3 quadros).
 - **Ritmo atrelado à taxa de atualização da display**: a FFT é
   limitada a uma atualização por quadro desenhado em vez de uma por
   callback de áudio. O intervalo vem de `QScreen::refreshRate()`, então
   o gráfico avança junto com a tela em vez de fixo em 30 fps.
 - O que sai daqui para o renderizador é apenas uma imagem RGBA
-  32x1 (altura da barra em R, pico em G), copiada sob mutex — o
+  64x1 (256 bytes: altura da barra em R, pico em G), copiada sob mutex — o
   callback `audioBufferReceived` roda na thread de multimídia e o
   `paintGL` na thread da GUI.
 
@@ -143,13 +152,35 @@ Fork: https://github.com/brdelphus/lararadio
   meio de um crossfade.
 - **`renderEq()`**: o fragment shader desenha as barras, os espaços
   entre elas e o degradê verde→amarelo→vermelho a partir da altura. A
-  CPU só envia a linha de 128 bytes por quadro, então o visual é
+  CPU só envia a linha de 256 bytes por quadro, então o visual é
   inteiramente do lado da GPU.
 - Uma passagem dedicada em vez de um `.frag` de efeito, para que
   shaders customizados do usuário continuem com a interface de uma
   única sampler.
-- Falhas são permanentes: um shader ausente ou quebrado é reportado uma
-  vez e depois ignorado, nunca tentado a cada quadro.
+- Falhas são permanentes, por shader: um fragment ausente ou quebrado
+  é reportado uma vez e depois ignorado, nunca tentado a cada quadro.
+
+#### `shaders/eqcircle.frag` (novo) / `videomixer.h` / `videomixer.cpp`
+- **Modo de EQ circular (radial)**: a mesma linha de 64 bandas
+  disposta ao redor do centro da saída em vez de encostada na borda
+  inferior, com um hub vazio, raios crescendo para fora e o marcador
+  de pico no próprio raio. Escolhido com `EqMode::Circle`
+  (`video/eqvisualizer = circle`).
+- O leque de raios é deslocado meio slot, assim um raio cai em cada eixo
+  da tela. Sem isso, as emendas caem exatamente em 0/90/180/270° e
+  essas quatro direções saem em branco.
+- A emenda em 360° é contornada com `mod(floor(slot), uBands)` em vez
+  de limitar o valor: o `atan` devolve exatamente 2π na metade negativa
+  da linha central, e limitar mapearia isso para uma tira fina de um
+  pixel no fim da linha em vez de voltar para a banda 0.
+- As posições são corrigidas pela proporção antes de tomar o raio, então
+  uma saída 16:9 recebe um círculo e não uma elipse.
+- `ensureEqProgram()` religa quando o modo muda (o caminho do fragment
+  com que foi compilado fica memorizado), e as falhas são acompanhadas
+  por caminho, para que um visualizador quebrado não derrube o outro.
+- **Corrigido um ponteiro nulo**: `refreshIncomingDeck()` chamava
+  `m_decks[n]->isVideoActive()` sem proteção no ramo de reserva, então
+  mostrar um `VideoMixer` antes de `setDeck()` quebrava.
 
 #### `videomixer.h` / `videomixer.cpp` / `spectrumanalyzer.h` / `spectrumanalyzer.cpp`
 - **Redesenho na taxa da display**: o timer de repaint do mixer estava
@@ -177,8 +208,33 @@ Fork: https://github.com/brdelphus/lararadio
 
 #### `configdialog.ui` / `configdialog.cpp`
 - **Visualizador de EQ (aba Vídeo)**: uma combo salva em
-  `video/eqvisualizer` com *Desligado* (padrão) e *Barras*.
+  `video/eqvisualizer` com *Desligado* (padrão), *Barras* e *Círculo*.
   Opt-in, então as configurações existentes não mudam.
+
+### Corrigido
+
+#### `spectrumanalyzer.cpp`
+- **A FFT calculava a parte imaginária do twiddle a partir da parte
+  real duas vezes**: `vi = re[..] * ci + re[..] * cr`, onde o segundo
+  `re` deveria ser `im`. Cada borboleta corrompia `im` já no primeiro
+  estágio, deixando um piso de lixo broadband 20–30 dB abaixo do pico
+  em *todas* as bandas. Um tom puro de 1 kHz acendia 31 das 32 barras
+  entre 43 e 182/255, então o gráfico parecia uma parede sólida que
+  apenas pulsava — acrescentar barras a isso não teria ajudado. O tom
+  ainda picava na banda certa, e foi exatamente por isso que a verificação
+  de posição do tom passava; agora ela também exige que um tom acenda no
+  máximo um quarto das barras. Depois da correção o mesmo tom acende 8
+  das 64 e todas as outras bandas ficam em 0 exato.
+- **`m_updateTimer` nunca era iniciado**, então `elapsed()` devolvia um
+  número negativo gigante e o gate em `feed()` comparava contra um ramo
+  `sinceMs < 0` que nunca podia disparar. Foi por isso que a correção de
+  ritmo registrada acima não tinha efeito de verdade: cada buffer de áudio
+  rodava uma FFT (~38/s vindo de MP3) independente do que a display
+  conseguisse mostrar. O timer começa no construtor, o gate volta a
+  descartar buffers dentro do intervalo do quadro (200 buffers alimentados
+  em sequência agora custam 1 transformação, não 204), e
+  `analysisCount()` expõe a contagem para o gate ser verificado
+  diretamente em vez de cronometrar um laço.
 
 ### Alterado
 

@@ -109,7 +109,7 @@ Fork: https://github.com/brdelphus/lararadio
   over a Hann-windowed mono downmix, fed from `calculateRMS()` — the
   same buffers that already drive the VU meters, so there is no extra
   tap on the audio path. No new dependency.
-- **32 bars, log-spaced where the transform allows it**: band edges are
+- **64 bars, log-spaced where the transform allows it**: band edges are
   spaced logarithmically from 30 Hz, then converted to FFT bins
   (`bin = Hz * kFftSize / rate`) and each bar is given at least one bin.
   Without that last step the low bands would all collapse onto bin 1
@@ -118,12 +118,21 @@ Fork: https://github.com/brdelphus/lararadio
 - **Instant attack, gradual release**: bars snap up on a transient and
   ease back down, and a peak marker lingers a couple of seconds above
   them. Levels are scaled across -72..-12 dB.
+- **One filter, one owner**: `analyse()` now only computes the meter
+  (instant attack, timed release) while `takeFrame()` only applies the
+  display filter and writes the row. Both used to smooth *and* both
+  wrote `m_row`, on separate clocks — a filter running ~98 times a
+  second instead of once per repaint, plus two threads racing over the
+  same pixels. The filter is a 20 ms time constant applied once per
+  painted frame and only on the way down, so attack is not filtered at
+  all. Time from a transient to 90% of full scale dropped from 64 ms
+  (5 painted frames) to 32 ms (3 painted frames).
 - **Paced to the display's refresh rate**: the FFT is throttled to one
   update per painted frame rather than one per audio callback. The
   interval comes from `QScreen::refreshRate()`, so the graph advances in
   step with the display instead of at a fixed 30 fps.
-- The only thing handed to the renderer is a 32x1 RGBA image (bar
-  height in R, peak in G), copied under a mutex — the
+- The only thing handed to the renderer is a 64x1 RGBA image (256
+  bytes: bar height in R, peak in G), copied under a mutex — the
   `audioBufferReceived` callback runs on the multimedia thread while
   `paintGL` runs on the GUI thread.
 
@@ -135,12 +144,34 @@ Fork: https://github.com/brdelphus/lararadio
   deck's last frame on screen — is never blanked mid-crossfade.
 - **`renderEq()`**: the fragment shader draws the bars, the gaps
   between them and the green→yellow→red ramp from height. The CPU only
-  uploads the 128-byte level row per frame, so the visual is entirely
+  uploads the 256-byte level row per frame, so the visual is entirely
   GPU-side.
 - A dedicated pass rather than an effect `.frag`, so custom user shaders
   in the shader folder keep their existing single-sampler interface.
-- Failures are sticky: a missing or broken shader is reported once and
-  then skipped, never retried per frame.
+- Failures are sticky, per shader: a missing or broken fragment is
+  reported once and then skipped, never retried per frame.
+
+#### `shaders/eqcircle.frag` (new) / `videomixer.h` / `videomixer.cpp`
+- **Circular (radial) EQ mode**: the same 64-band row fanned around the
+  centre of the output instead of standing on its bottom edge, with a
+  clear hub, spokes growing outward and the peak marker riding at its
+  own radius. Chosen with `EqMode::Circle` (`video/eqvisualizer =
+  circle`).
+- The spoke fan is offset by half a slot, so a spoke lands on every
+  screen axis. Without it the seams fall exactly on 0/90/180/270° and
+  those four directions come out blank.
+- The seam at 360° wraps with `mod(floor(slot), uBands)` rather than
+  clamping: `atan` returns exactly 2π along the negative-x half of the
+  centre line, and clamping would map that to a one-texel-thin strip at
+  the end of the row instead of back to band 0.
+- Positions are corrected for aspect ratio before the radius is taken,
+  so a 16:9 output gets a circle and not an ellipse.
+- `ensureEqProgram()` relinks when the mode changes (the fragment path
+  it was linked from is remembered), and failures are tracked per path
+  so one broken visualizer doesn't take the other one down.
+- **Fixed a null dereference**: `refreshIncomingDeck()` called
+  `m_decks[n]->isVideoActive()` unguarded in its fallback branch, so
+  showing a `VideoMixer` before `setDeck()` crashed.
 
 #### `videomixer.h` / `videomixer.cpp` / `spectrumanalyzer.h` / `spectrumanalyzer.cpp`
 - **Repaint at the display rate**: the mixer's repaint timer was pinned
@@ -167,8 +198,32 @@ Fork: https://github.com/brdelphus/lararadio
 
 #### `configdialog.ui` / `configdialog.cpp`
 - **EQ visualizer (Vídeo tab)**: a combo saved to `video/eqvisualizer`
-  with *Desligado* (default) and *Barras*. Opt-in, so existing setups
-  are unchanged.
+  with *Desligado* (default), *Barras* and *Círculo*. Opt-in, so
+  existing setups are unchanged.
+
+### Fixed
+
+#### `spectrumanalyzer.cpp`
+- **The FFT computed its twiddle's imaginary part from the real part
+  twice**: `vi = re[..] * ci + re[..] * cr`, where the second `re` should
+  have been `im`. Every butterfly therefore corrupted `im` starting at
+  the first stage, leaving a broadband floor of garbage 20–30 dB under
+  the peak in *every* band. A single 1 kHz tone lit 31 of 32 bars
+  between 43 and 182/255, so the graph read as a solid wall that merely
+  pulsed — adding bars to it would not have helped. The tone still
+  peaked in the right band, which is exactly why the tone-placement
+  check passed; it now also asserts that a tone lights at most a
+  quarter of the bars. After the fix the same tone lights 8 of 64 and
+  every other band is a clean 0.
+- **`m_updateTimer` was never started**, so `elapsed()` returned a huge
+  negative number and the gate in `feed()` compared it against a
+  `sinceMs < 0` branch that could never fire. This is why the pacing fix
+  noted above had not actually taken effect: every audio buffer ran an
+  FFT (~38/s from MP3) no matter what the display could show. The timer
+  starts in the constructor, the gate drops buffers inside the frame
+  interval again (200 buffers fed back to back now cost 1 transform, not
+  204), and `analysisCount()` exposes the count so the gate can be
+  checked directly rather than by timing a loop.
 
 ### Changed
 
