@@ -67,19 +67,41 @@ public:
 
     // EQ visualizer: what to show on the video output when the incoming
     // deck is playing audio with no video.
-    enum class EqMode {
-        Off,
-        Bars,
-        Circle,
+    //
+    // This table is the single source of truth. The persisted setting
+    // (video/eqvisualizer), the combo in the settings dialog, the fragment
+    // shader linked for the current mode and the "draw the EQ rather than
+    // an effect" gate all read from it, so adding a visualizer costs one
+    // row here, one shaders/eq*.frag and one resources.qrc line.
+    //
+    // `id` is what lands in the settings and must never change once
+    // shipped. It doubles as the opt-out: an id this build does not know
+    // resolves to null (i.e. off), which is what an unconfigured or
+    // upgraded installation stores anyway.
+    //
+    // `label` is a raw literal rather than a QString because the table is
+    // built before Qt loads any translations, and because lupdate can only
+    // extract a string it can actually see: QT_TRANSLATE_NOOP leaves the
+    // text untouched while still registering it under the VideoMixer
+    // context. ConfigDialog translates it with
+    // QCoreApplication::translate("VideoMixer", ...).
+    struct EqVisualizer
+    {
+        QString     id;
+        const char *label;
+        QString     fragPath; // ":/shaders/eq....frag"
     };
-    static EqMode modeFromString(const QString &value);
-    static QString modeToString(EqMode mode);
+    static const QList<EqVisualizer> &eqVisualizers();
+    static const EqVisualizer *eqVisualizerFor(const QString &id);
 
     // The analyzer is not owned here — it lives in MainWindow and is fed from
     // the same audio buffers that drive the VU meters.
     void setSpectrumAnalyzer(SpectrumAnalyzer *analyzer);
-    void setEqMode(EqMode mode);
-    EqMode eqMode() const { return m_eqMode; }
+    void setEqVisualizer(const QString &id);
+    QString eqVisualizerId() const { return m_eqId; }
+    // The visualizer to draw, or null when it is off/unknown — also the
+    // gate renderScene() uses to pick this pass over an effect.
+    const EqVisualizer *eqVisualizer() const { return eqVisualizerFor(m_eqId); }
 
     // current visual mix progress, 0..1 (exposed for tests/diagnostics)
     float progress() const { return m_smoothProgress; }
@@ -152,8 +174,10 @@ private:
     QSet<QString> m_failedEffects; // ids that failed to compile (never retry)
 
     // EQ: analyzer owned by MainWindow, level texture + program here.
+    // m_eqId is the *resolved* persisted id, so "off" is stored for a
+    // value this build does not recognise and eqVisualizer() is null.
     SpectrumAnalyzer *m_analyzer = nullptr;
-    EqMode m_eqMode = EqMode::Off;
+    QString m_eqId = QStringLiteral("off");
     std::unique_ptr<QOpenGLTexture> m_eqTex;
     std::unique_ptr<QOpenGLShaderProgram> m_eqProgram;
     quint64 m_eqLastSeq = 0;    // last frame uploaded, 0 = nothing yet

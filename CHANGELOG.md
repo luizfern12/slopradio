@@ -155,8 +155,7 @@ Fork: https://github.com/brdelphus/lararadio
 - **Circular (radial) EQ mode**: the same 64-band row fanned around the
   centre of the output instead of standing on its bottom edge, with a
   clear hub, spokes growing outward and the peak marker riding at its
-  own radius. Chosen with `EqMode::Circle` (`video/eqvisualizer =
-  circle`).
+  own radius. Selected with `video/eqvisualizer = circle`.
 - The spoke fan is offset by half a slot, so a spoke lands on every
   screen axis. Without it the seams fall exactly on 0/90/180/270° and
   those four directions come out blank.
@@ -257,6 +256,33 @@ Fork: https://github.com/brdelphus/lararadio
   **Caminhos** (the three directories), **Saídas** (empty placeholder
   for future output settings) and **Comportamento** (clock options).
   The dialog now uses real layouts instead of absolute positioning.
+
+#### `videomixer.h` / `videomixer.cpp` / `configdialog.cpp` / `mainwindow.cpp`
+- **EQ visualizers are table-driven**: `VideoMixer::eqVisualizers()` is a
+  single list of `{ id, label, fragmentPath }` rows and is now the only
+  place a visualizer is declared. The persisted setting
+  (`video/eqvisualizer`), the settings-dialog combo, the fragment
+  `ensureEqProgram()` links and the "draw the EQ rather than an effect"
+  gate in `renderScene()` all read from it, so adding one costs a table
+  row, a `shaders/eq*.frag` and a `resources.qrc` entry. It used to cost
+  those plus an `EqMode` enumerator, two `if` chains, a ternary, a
+  condition growing another `||` and a hardcoded `addItem` in the dialog.
+- **`EqMode` / `modeFromString()` / `modeToString()` are gone**: the mixer
+  stores the persisted id instead, via `setEqVisualizer()`,
+  `eqVisualizerId()` and `eqVisualizer()`. An id the build does not know
+  — settings written by a newer version, or a hand-edited file — resolves
+  to null and reads as "off", exactly like an unconfigured install, and
+  `setEqVisualizer()` normalises it so nothing re-resolves it differently
+  later. The stored values `bars` and `circle` are unchanged, so existing
+  configurations keep working; `cfgtest` still asserts the unknown-value
+  fallback, now against the table rather than a hardcoded count.
+- **Combo entries stay translatable**: the labels are `QT_TRANSLATE_NOOP`
+  literals inside the table, because the table is built before Qt loads
+  any translation and because `lupdate` cannot extract a `QString`
+  variable. `ConfigDialog` translates them with
+  `QCoreApplication::translate("VideoMixer", ...)`. This is an
+  improvement over the old `tr("Barras")` calls, which lived in the
+  `ConfigDialog` context: a fresh `lupdate` run now finds them at all.
 
 ---
 

@@ -50,10 +50,15 @@ ConfigDialog::ConfigDialog(QWidget *parent)
     ui->video_hwdecode->addItem(tr("Desligada (CPU)"), QStringLiteral("off"));
 
     // EQ visualizer shown on the video output when the incoming deck is an
-    // audio-only track.
+    // audio-only track. The list comes from VideoMixer's table so the combo
+    // grows with it; "off" is not in the table because it is the absence of
+    // a visualizer, so it is prepended by hand. An id in the settings that
+    // this build does not know simply fails findData() below and falls back
+    // to index 0.
     ui->video_eqvisualizer->addItem(tr("Desligado"), QStringLiteral("off"));
-    ui->video_eqvisualizer->addItem(tr("Barras"), QStringLiteral("bars"));
-    ui->video_eqvisualizer->addItem(tr("Círculo"), QStringLiteral("circle"));
+    for (const VideoMixer::EqVisualizer &v : VideoMixer::eqVisualizers())
+        ui->video_eqvisualizer->addItem(
+            QCoreApplication::translate("VideoMixer", v.label), v.id);
     const QString eqMode = settings.value("video/eqvisualizer", QStringLiteral("off")).toString();
     const int eidx = ui->video_eqvisualizer->findData(eqMode);
     ui->video_eqvisualizer->setCurrentIndex(eidx >= 0 ? eidx : 0);

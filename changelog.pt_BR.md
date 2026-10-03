@@ -164,8 +164,7 @@ Fork: https://github.com/brdelphus/lararadio
 - **Modo de EQ circular (radial)**: a mesma linha de 64 bandas
   disposta ao redor do centro da saída em vez de encostada na borda
   inferior, com um hub vazio, raios crescendo para fora e o marcador
-  de pico no próprio raio. Escolhido com `EqMode::Circle`
-  (`video/eqvisualizer = circle`).
+  de pico no próprio raio. Escolhido com `video/eqvisualizer = circle`.
 - O leque de raios é deslocado meio slot, assim um raio cai em cada eixo
   da tela. Sem isso, as emendas caem exatamente em 0/90/180/270° e
   essas quatro direções saem em branco.
@@ -270,6 +269,37 @@ Fork: https://github.com/brdelphus/lararadio
   vazio para futuras configurações de saída) e **Comportamento**
   (opções do relógio). O dialogo agora usa layouts reais em vez de
   posicionamento absoluto.
+
+#### `videomixer.h` / `videomixer.cpp` / `configdialog.cpp` / `mainwindow.cpp`
+- **Os visualizadores de EQ agora são dirigidos por tabela**:
+  `VideoMixer::eqVisualizers()` é uma única lista de linhas
+  `{ id, label, fragmentPath }` e hoje é o único lugar onde um
+  visualizador é declarado. A configuração persistida
+  (`video/eqvisualizer`), o combo do diálogo de configurações, o
+  fragmento que `ensureEqProgram()` liga e a condição "desenhar o EQ em
+  vez de um efeito" em `renderScene()` leem todos dela — então
+  acrescentar um custa uma linha na tabela, um `shaders/eq*.frag` e uma
+  entrada no `resources.qrc`. Antes custava tudo isso mais um
+  enumerador em `EqMode`, duas cadeias de `if`, um operador ternário,
+  uma condição ganhando mais um `||` e um `addItem` fixo no diálogo.
+- **`EqMode`, `modeFromString()` e `modeToString()` foram removidos**: o
+  mixer passou a guardar o id persistido, via `setEqVisualizer()`,
+  `eqVisualizerId()` e `eqVisualizer()`. Um id que a versão atual não
+  reconhece — configuração gravada por uma versão mais nova ou editada à
+  mão — resolve para nulo e é lido como "off", exatamente como em uma
+  instalação não configurada, e `setEqVisualizer()` o normaliza para que
+  nada o resolva de forma diferente depois. Os valores gravados `bars` e
+  `circle` não mudaram, então as configurações existentes continuam
+  funcionando; o `cfgtest` ainda verifica o retorno para "off" diante de
+  um valor desconhecido, agora contra a tabela em vez de uma contagem
+  fixa.
+- **Os itens do combo continuam traduzíveis**: os rótulos são literais
+  `QT_TRANSLATE_NOOP` dentro da tabela, porque a tabela é construída
+  antes de o Qt carregar qualquer tradução e porque o `lupdate` não
+  consegue extrair uma variável `QString`. O `ConfigDialog` os traduz
+  com `QCoreApplication::translate("VideoMixer", ...)`. Isso melhora o
+  que eram as antigas chamadas `tr("Barras")`: um novo `lupdate` agora
+  as enxerga.
 
 ---
 

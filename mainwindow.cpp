@@ -1557,9 +1557,10 @@ void MainWindow::applyVideoOptions()
     mixer->setEffects(VideoMixer::availableEffects(shaderDir));
     mixer->setCurrentEffect(settings->value("video/transition", "crossfade").toString());
 
-    // EQ visualizer for audio-only tracks (off / bars / circle).
-    mixer->setEqMode(
-        VideoMixer::modeFromString(settings->value("video/eqvisualizer", "off").toString()));
+    // EQ visualizer for audio-only tracks; the mixer resolves the id against
+    // its own table and treats anything it does not know as "off".
+    mixer->setEqVisualizer(
+        settings->value("video/eqvisualizer", "off").toString());
 }
 
 void MainWindow::savePlaylist()

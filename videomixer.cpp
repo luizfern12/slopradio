@@ -41,8 +41,6 @@ const GLfloat kQuad[16] = {
 
 const char *kDefaultFrag = ":/shaders/crossfade.frag";
 const char *kDefaultVert = ":/shaders/fullscreen.vert";
-const char *kEqBarsFrag = ":/shaders/eqbars.frag";
-const char *kEqCircleFrag = ":/shaders/eqcircle.frag";
 
 // YUV → RGB converter (NV12 luma+interleaved CbCr, or YUV420P planar)
 // rendered into a per-deck RGBA FBO. The YUV planes are uploaded with the
@@ -259,22 +257,34 @@ QList<VideoMixer::Effect> VideoMixer::availableEffects(const QString &customShad
     return out;
 }
 
-VideoMixer::EqMode VideoMixer::modeFromString(const QString &value)
+// The visualizer table lives with the class (see EqVisualizer in the
+// header); "off" deliberately is not a row, because it is the absence of
+// one and must not drag a fragment shader along with it.
+const QList<VideoMixer::EqVisualizer> &VideoMixer::eqVisualizers()
 {
-    if (value == QLatin1String("bars"))
-        return EqMode::Bars;
-    if (value == QLatin1String("circle"))
-        return EqMode::Circle;
-    return EqMode::Off;
+    // Order is the order ConfigDialog offers them.
+    static const QList<EqVisualizer> list = {
+        { QStringLiteral("bars"),
+          QT_TRANSLATE_NOOP("VideoMixer", "Barras"),
+          QStringLiteral(":/shaders/eqbars.frag") },
+        { QStringLiteral("circle"),
+          QT_TRANSLATE_NOOP("VideoMixer", "Círculo"),
+          QStringLiteral(":/shaders/eqcircle.frag") },
+    };
+    return list;
 }
 
-QString VideoMixer::modeToString(EqMode mode)
+const VideoMixer::EqVisualizer *VideoMixer::eqVisualizerFor(const QString &id)
 {
-    if (mode == EqMode::Bars)
-        return QStringLiteral("bars");
-    if (mode == EqMode::Circle)
-        return QStringLiteral("circle");
-    return QStringLiteral("off");
+    if (id.isEmpty() || id == QLatin1String("off"))
+        return nullptr;
+    // eqVisualizers() is only ever read through a const reference, so the
+    // list is never detached and the returned pointer stays valid.
+    for (const EqVisualizer &v : eqVisualizers()) {
+        if (v.id == id)
+            return &v;
+    }
+    return nullptr;
 }
 
 void VideoMixer::setSpectrumAnalyzer(SpectrumAnalyzer *analyzer)
@@ -286,9 +296,14 @@ void VideoMixer::setSpectrumAnalyzer(SpectrumAnalyzer *analyzer)
     syncFrameRate();
 }
 
-void VideoMixer::setEqMode(EqMode mode)
+void VideoMixer::setEqVisualizer(const QString &id)
 {
-    m_eqMode = mode;
+    // Resolved once, up front: a value this build does not know (settings
+    // written by a newer version, or a hand-edited file) becomes "off" and
+    // then behaves exactly like a configured "off" everywhere downstream,
+    // instead of needing a null check at every use site.
+    const EqVisualizer *v = eqVisualizerFor(id);
+    m_eqId = v ? v->id : QStringLiteral("off");
 }
 
 QString VideoMixer::readSource(const QString &path) const
@@ -829,19 +844,21 @@ void VideoMixer::renderEq()
 
 bool VideoMixer::ensureEqProgram()
 {
-    const char *wantFrag = (m_eqMode == EqMode::Circle) ? kEqCircleFrag
-                                                        : kEqBarsFrag;
+    const EqVisualizer *vis = eqVisualizer();
+    if (!vis)
+        return false;
+    const QString &wantFrag = vis->fragPath;
 
     // Already linked for this mode; switching modes relinks it here.
-    if (m_eqProgram && m_eqFragPath == QLatin1String(wantFrag))
+    if (m_eqProgram && m_eqFragPath == wantFrag)
         return true;
     // A broken shader must not be retried every frame.
-    if (m_eqFailedFrag == QLatin1String(wantFrag))
+    if (m_eqFailedFrag == wantFrag)
         return false;
 
-    const QString frag = readSource(QLatin1String(wantFrag));
+    const QString frag = readSource(wantFrag);
     if (frag.isEmpty()) {
-        m_eqFailedFrag = QLatin1String(wantFrag);
+        m_eqFailedFrag = wantFrag;
         return false;
     }
 
@@ -853,12 +870,12 @@ bool VideoMixer::ensureEqProgram()
         || !program->addShaderFromSourceCode(QOpenGLShader::Fragment, frag)
         || !program->link()) {
         qWarning() << "VideoMixer: EQ visualizer shader failed to build";
-        m_eqFailedFrag = QLatin1String(wantFrag);
+        m_eqFailedFrag = wantFrag;
         return false;
     }
 
     m_eqProgram = std::move(program);
-    m_eqFragPath = QLatin1String(wantFrag);
+    m_eqFragPath = wantFrag;
     return true;
 }
 
@@ -950,9 +967,8 @@ void VideoMixer::renderScene()
     // Audio-only material: show the EQ visualizer instead of an effect running
     // over black. Only outside a transition, so fromHeld (which keeps the
     // outgoing deck's last frame on screen) is never blanked out mid-crossfade.
-    if ((m_eqMode == EqMode::Bars || m_eqMode == EqMode::Circle)
-        && !fromActive && !toActive && !m_inTransition && m_analyzer
-        && m_analyzer->hasData()) {
+    if (eqVisualizer() && !fromActive && !toActive && !m_inTransition
+        && m_analyzer && m_analyzer->hasData()) {
         uploadEqRow();
         renderEq();
         return;
