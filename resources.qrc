@@ -53,5 +53,9 @@
         <file>shaders/rotate3d.frag</file>
         <file>shaders/eqbars.frag</file>
         <file>shaders/eqcircle.frag</file>
+        <file>shaders/eqmountain.frag</file>
+        <file>shaders/eqside.frag</file>
+        <file>shaders/eqdots.frag</file>
+        <file>shaders/eqradialmirror.frag</file>
     </qresource>
 </RCC>

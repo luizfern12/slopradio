@@ -172,6 +172,49 @@ Fork: https://github.com/brdelphus/lararadio
   `m_decks[n]->isVideoActive()` unguarded in its fallback branch, so
   showing a `VideoMixer` before `setDeck()` crashed.
 
+#### `shaders/eqmountain.frag` (new) / `shaders/eqside.frag` (new) / `shaders/eqdots.frag` (new) / `shaders/eqradialmirror.frag` (new) / `videomixer.cpp` / `resources.qrc`
+- **Four more EQ visualizers**, each one exactly what the table-driven
+  refactor promised: a row in `eqVisualizers()`, a fragment shader and a
+  `resources.qrc` line, and nothing else.
+  - **Montanha** — the bars stitched into a single silhouette. Each
+    column takes the straight line between the two bands it lies
+    between, so the graph is one shape instead of a comb. The right
+    edge clamps rather than wrapping, because `mod()` would reach back
+    to band 0 for the last columns and drop a cliff at x = 1. It has no
+    gutter uniform at all: the absence of one is the whole difference
+    from `eqbars`.
+  - **Lateral** — the same row rotated a quarter turn. Frequency runs up
+    the screen, level extends from the left edge, and band 0 sits on the
+    bottom so it reads bottom-to-top the way the bars read
+    left-to-right. A `level > 0.001` guard keeps the left edge dark
+    through silence (`x <= level` is true at x = 0 even for a band with
+    nothing in it).
+  - **Matriz de LEDs** — each column quantised into 24 segments with a
+    gutter between them. A segment lights only once the level clears its
+    *midpoint*, which is what makes it a quantiser rather than a bar
+    with lines drawn over it: the stack counts up in visible steps. The
+    peak marker is the one segment the level has fallen away from.
+  - **Espelho radial** — the circle's spoke geometry anchored on a ring
+    at the middle of the output instead of on the hub, so a spoke grows
+    inward and outward at once and reads as an iris breathing rather
+    than a fan opening. `rMid ± span` reaches exactly the hub and the
+    outer radius at full level, so the hub stays clear by construction
+    rather than by a test, and the peak marker rides both tips.
+- **Every uniform in `renderEq()` is now guarded on
+  `uniformLocation() >= 0`.** Each visualizer declares only what it
+  draws with — mountain has no gutter to space, the radial pair add
+  `uRatio` — so a shader that drops a uniform must be skipped rather
+  than handed a -1 location. Behaviour is unchanged for `eqbars` and
+  `eqcircle`, which already declared all four.
+- All four are asserted in `rendertest`, on properties rather than pixel
+  counts: mountain's baseline is **1** run where the bars show 64, and
+  its tip steps at most **7** rows between neighbouring columns (limit
+  90, where the bars jump a full bar height); side gives one run per row
+  flush against the left edge and **64** runs down a vertical cut —
+  exactly the transpose of the bars; dots chops a column into **17** LED
+  segments where a bar gives 1; radialmirror keeps the hub clear and
+  centres all 64 spokes on the mid ring to within **1 px**.
+
 #### `videomixer.h` / `videomixer.cpp` / `spectrumanalyzer.h` / `spectrumanalyzer.cpp`
 - **Repaint at the display rate**: the mixer's repaint timer was pinned
   at 33 ms (~30 fps), which capped the visualizer at 30 fps even on a

@@ -181,6 +181,52 @@ Fork: https://github.com/brdelphus/lararadio
   `m_decks[n]->isVideoActive()` sem proteção no ramo de reserva, então
   mostrar um `VideoMixer` antes de `setDeck()` quebrava.
 
+#### `shaders/eqmountain.frag` (novo) / `shaders/eqside.frag` (novo) / `shaders/eqdots.frag` (novo) / `shaders/eqradialmirror.frag` (novo) / `videomixer.cpp` / `resources.qrc`
+- **Mais quatro visualizadores de EQ**, cada um exatamente o que a
+  refatoração dirigida por tabela prometeu: uma linha em
+  `eqVisualizers()`, um shader de fragmento e uma entrada em
+  `resources.qrc` — mais nada.
+  - **Montanha** — as barras costuradas em um único contorno. Cada
+    coluna usa a reta entre as duas bandas entre as quais ela está, então
+    o gráfico vira uma forma só em vez de um pente. A borda direita é
+    limitada em vez de contornar, porque `mod()` alcançaria de volta até
+    a banda 0 nas últimas colunas e derrubaria uma escada em x = 1. Ela
+    não tem uniform de espaçamento nenhum: a ausência dele é toda a
+    diferença em relação ao `eqbars`.
+  - **Lateral** — a mesma linha girada um quarto de volta. A frequência
+    sobe pela tela, o nível sai da borda esquerda e a banda 0 fica no
+    chão para que a leitura seja de baixo para cima, do jeito que as
+    barras se leem da esquerda para a direita. Um guard
+    `level > 0.001` mantém a borda escura no silêncio (`x <= level` é
+    verdadeiro em x = 0 mesmo para uma banda sem nada).
+  - **Matriz de LEDs** — cada coluna quantizada em 24 segmentos com uma
+    calha entre eles. Um segmento só acende quando o nível ultrapassa o
+    *ponto médio* dele, e é isso que faz um quantizador em vez de uma
+    barrinha com linhas desenhadas por cima: a pilha conta em passos
+    visíveis. O marcador de pico é o segmento do qual o nível já caiu.
+  - **Espelho radial** — a geometria de raios do círculo ancorada num
+    anel no meio da saída em vez do hub, então um raio cresce para
+    dentro e para fora ao mesmo tempo e lê como uma íris respirando em
+    vez de um leque abrindo. `rMid ± span` chega exatamente ao hub e ao
+    raio externo com o nível máximo, então o hub fica limpo por
+    construção e não por teste, e o marcador de pico cavalca as duas
+    pontas.
+- **Todo uniform em `renderEq()` agora é protegido por
+  `uniformLocation() >= 0`.** Cada visualizador declara só o que desenha
+  — a montanha não tem calha para espaçar, os dois radiais adicionam
+  `uRatio` — então um shader que omita um uniform deve ser ignorado em
+  vez de receber uma localização -1. O comportamento não muda para
+  `eqbars` e `eqcircle`, que já declaravam os quatro.
+- Os quatro são verificados em `rendertest`, por propriedade e não por
+  contagem de pixels: a linha de base da montanha tem **1** run onde as
+  barras mostram 64, e a ponta dela anda no máximo **7** linhas entre
+  colunas vizinhas (limite 90, onde as barras saltam uma altura de barra
+  inteira); a lateral dá um run por linha encostado na borda esquerda e
+  **64** runs num corte vertical — exatamente o transposto das barras;
+  os pontos fatiam uma coluna em **17** segmentos de LED onde uma barra
+  dá 1; o espelho radial mantém o hub limpo e centraliza os 64 raios no
+  anel do meio com precisão de **1 px**.
+
 #### `videomixer.h` / `videomixer.cpp` / `spectrumanalyzer.h` / `spectrumanalyzer.cpp`
 - **Redesenho na taxa da display**: o timer de repaint do mixer estava
   fixo em 33 ms (~30 fps), o que limitava o visualizador em 30 fps mesmo

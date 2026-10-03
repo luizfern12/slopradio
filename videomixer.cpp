@@ -270,6 +270,18 @@ const QList<VideoMixer::EqVisualizer> &VideoMixer::eqVisualizers()
         { QStringLiteral("circle"),
           QT_TRANSLATE_NOOP("VideoMixer", "Círculo"),
           QStringLiteral(":/shaders/eqcircle.frag") },
+        { QStringLiteral("mountain"),
+          QT_TRANSLATE_NOOP("VideoMixer", "Montanha"),
+          QStringLiteral(":/shaders/eqmountain.frag") },
+        { QStringLiteral("side"),
+          QT_TRANSLATE_NOOP("VideoMixer", "Lateral"),
+          QStringLiteral(":/shaders/eqside.frag") },
+        { QStringLiteral("dots"),
+          QT_TRANSLATE_NOOP("VideoMixer", "Matriz de LEDs"),
+          QStringLiteral(":/shaders/eqdots.frag") },
+        { QStringLiteral("radialmirror"),
+          QT_TRANSLATE_NOOP("VideoMixer", "Espelho radial"),
+          QStringLiteral(":/shaders/eqradialmirror.frag") },
     };
     return list;
 }
@@ -814,14 +826,22 @@ void VideoMixer::renderEq()
     const int fromLoc = m_eqProgram->uniformLocation("from");
     if (fromLoc >= 0)
         m_eqProgram->setUniformValue(fromLoc, 0);
-    m_eqProgram->setUniformValue(m_eqProgram->uniformLocation("uBands"),
-                                 float(SpectrumAnalyzer::kBands));
-    m_eqProgram->setUniformValue(m_eqProgram->uniformLocation("uGap"), 0.18f);
-    m_eqProgram->setUniformValue(m_eqProgram->uniformLocation("uPeakSize"), 0.008f);
-    // Circular mode only; the bars shader has no such uniform.
-    const int ratioLoc = m_eqProgram->uniformLocation("uRatio");
-    if (ratioLoc >= 0)
-        m_eqProgram->setUniformValue(ratioLoc, m_ratio);
+
+    // Everything else is optional, so every one of them is guarded: each
+    // visualizer declares only what it draws with — eqmountain has no gutter
+    // to space, eqside swaps the axes, the radial pair adds uRatio — and a
+    // shader that drops a uniform should not need a matching edit in here.
+    // glUniform* would ignore a -1 location anyway; guarding just makes the
+    // contract explicit instead of relying on that.
+    auto setFloat = [this](const char *name, float value) {
+        const int loc = m_eqProgram->uniformLocation(name);
+        if (loc >= 0)
+            m_eqProgram->setUniformValue(loc, value);
+    };
+    setFloat("uBands", float(SpectrumAnalyzer::kBands));
+    setFloat("uGap", 0.18f);
+    setFloat("uPeakSize", 0.008f);
+    setFloat("uRatio", m_ratio);
 
     if (m_vao && m_vao->isCreated()) {
         m_vao->bind();
