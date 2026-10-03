@@ -52,6 +52,7 @@ typedef struct Playlist
 } Playlist;
 
 class QTimer;
+class QTreeView;
 
 class MainWindow : public QMainWindow
 {
@@ -125,6 +126,9 @@ private:
     void scaleWidgets();
     void applyAudioOutputDevice();
     void cuePreview(int row);
+    void cuePath(const QString &path);
+    void cuePlay(const QString &path, const QString &displayName);
+    void fileBrowserOptionsMenu(QTreeView *view, const QPoint &pos);
 
     Ui::MainWindow *ui;
     AudioPlayer audioplayer1;

@@ -74,6 +74,22 @@ Fork: https://github.com/brdelphus/lararadio
   controls or closing it end the preview. Picking another row
   retargets the same window.
 
+#### `mainwindow.h` / `mainwindow.cpp`
+- **Pre-cue from the file browsers**: right-clicking a row in either
+  left-hand file browser (`files` — Músicas, `jingle_files` — Jingles)
+  now offers **Pré Escuta**, opening the same cue window as the
+  playlist's action. Media files play as they are; folders preview a
+  random track inside, matching what the playlist's folder rows do.
+  Non-media files (`.xml`, `.png`, `.desktop`, …) show no menu, since
+  the player could not open them anyway. Both browsers share a single
+  context-menu handler.
+- **`cuePreview()` split into `cuePath()` / `cuePlay()`**: the window
+  creation, `loadAndPlay()` and raise/activate sequence moved into
+  `cuePlay(path, displayName)`, shared by the playlist and the file
+  browsers. The folder random pick moved to the `randomMediaInFolder()`
+  helper, and the new `mediaDisplayName()` gives a file-browser item
+  the same `title - artist` label the playlist uses.
+
 #### `configdialog.ui` / `configdialog.cpp`
 - **Cue output device (Saídas tab)**: a second combo
   (`Dispositivo de fones (cue)`, saved to `audio/cueDevice`) routes

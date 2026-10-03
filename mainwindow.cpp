@@ -32,6 +32,8 @@
 #include <QFileInfo>
 #include <QSet>
 #include <QProcess>
+#include <QMenu>
+#include <QAction>
 #include <algorithm>
 #include <functional>
 
@@ -76,6 +78,23 @@ QString stripMediaExtension(QString name)
     return name;
 }
 
+// Label for a media file: TagLib's "title - artist" when the tag carries
+// both, else the file name without the media extension. Same rule the
+// playlist uses when it adds a file.
+QString mediaDisplayName(const QString &path)
+{
+    TagLib::FileRef aud(path.toStdString().c_str());
+    if (!aud.isNull() && aud.tag() && aud.audioProperties()) {
+        const TagLib::String title = aud.tag()->title();
+        const TagLib::String artist = aud.tag()->artist();
+        if (title != "" && artist != "")
+            return QString::fromStdString(title.toCString(true)) + " - "
+                 + QString::fromStdString(artist.toCString(true));
+    }
+
+    return stripMediaExtension(QFileInfo(path).fileName());
+}
+
 // Duration fallback for containers TagLib cannot read (mkv, webm, avi, mov).
 // Uses ffprobe, the same tool AudioPlayer::isValidMediaFile already relies on.
 QString probeDuration(const QString &path)
@@ -108,6 +127,22 @@ QStringList mediaFolderFilters()
     for (const QString &ext : videoExtensions())
         filters << "*." + ext;
     return filters;
+}
+
+// The random file of a folder, the same one the air playback would pick.
+// Returns an empty string when the folder holds no playable media.
+QString randomMediaInFolder(const QString &dirPath)
+{
+    QDir audioDir(dirPath);
+    const QStringList audioFiles = audioDir.entryList(mediaFolderFilters(), QDir::Files);
+
+    if (audioFiles.isEmpty()) {
+        qWarning() << "Pre-cue: no audio files in folder" << dirPath;
+        return "";
+    }
+
+    const int randomIndex = QRandomGenerator::global()->bounded(audioFiles.size());
+    return audioDir.absoluteFilePath(audioFiles.at(randomIndex));
 }
 
 // "M:SS" (minutes may exceed 59) or "H:MM:SS" -> seconds. Unknown or
@@ -347,6 +382,14 @@ void MainWindow::init()
     connect(ui->files, &QTreeView::clicked, this, &MainWindow::unSelectedJingle);
     connect(ui->jingle_files, &QTreeView::clicked, this, &MainWindow::unSelectedFiles);
 
+    // both file browsers share one "Pré Escuta" context menu
+    for (QTreeView *browser : {ui->files, ui->jingle_files}) {
+        browser->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(browser, &QTreeView::customContextMenuRequested, this, [this, browser](const QPoint &pos) {
+            fileBrowserOptionsMenu(browser, pos);
+        });
+    }
+
     ui->audio_list->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->audio_list, &QTreeWidget::customContextMenuRequested, this, &MainWindow::audioOptionsMenu); // use new syntax for more joy
 
@@ -579,22 +622,34 @@ void MainWindow::cuePreview(int row)
     QString path = item.path;
 
     if (item.type == "folder-music" || item.type == "folder-jingle") {
-        // same random pick the air playback does for folder items
-        QDir audioDir(path);
-        QStringList filters = mediaFolderFilters(); // audio + video
-        QStringList audioFiles = audioDir.entryList(filters, QDir::Files);
-
-        if (audioFiles.isEmpty()) {
-            qWarning() << "Pre-cue: no audio files in folder" << path;
+        path = randomMediaInFolder(path);
+        if (path.isEmpty())
             return;
-        }
-
-        int randomIndex = QRandomGenerator::global()->bounded(audioFiles.size());
-        path = audioDir.absoluteFilePath(audioFiles.at(randomIndex));
     } else if (item.type == "time") {
         path = time_audio_path + "/" + SayTimeAudio + ".mp3";
     }
 
+    // the playlist row already carries the name shown in the playlist
+    cuePlay(path, item.name);
+}
+
+// Cue straight from the file browsers: folders preview a random file, like
+// the folder items in the playlist do.
+void MainWindow::cuePath(const QString &path)
+{
+    QString mediaPath = path;
+
+    if (QFileInfo(path).isDir()) {
+        mediaPath = randomMediaInFolder(path);
+        if (mediaPath.isEmpty())
+            return;
+    }
+
+    cuePlay(mediaPath, mediaDisplayName(mediaPath));
+}
+
+void MainWindow::cuePlay(const QString &path, const QString &displayName)
+{
     if (!QFile::exists(path)) {
         qWarning() << "Pre-cue: file not found:" << path;
         return;
@@ -605,10 +660,38 @@ void MainWindow::cuePreview(int row)
         m_cueWindow->setOutputDevice(AudioPlayer::configuredCueDevice());
     }
 
-    m_cueWindow->loadAndPlay(path, item.name);
+    m_cueWindow->loadAndPlay(path, displayName);
     m_cueWindow->show();
     m_cueWindow->raise();
     m_cueWindow->activateWindow();
+}
+
+// Right-click menu of the file browsers (`files` / `jingle_files`), mirroring
+// the playlist's "Pré Escuta": the item under the cursor is previewed in the
+// same cue window. Nothing is offered on non-media files, which the player
+// could not open anyway.
+void MainWindow::fileBrowserOptionsMenu(QTreeView *view, const QPoint &pos)
+{
+    if (!view)
+        return;
+
+    const QModelIndex index = view->indexAt(pos);
+    if (!index.isValid())
+        return;
+
+    const QString path = model->filePath(index);
+    if (!model->isDir(index) && !isMediaFile(path))
+        return;
+
+    QMenu *menu = new QMenu(this);
+
+    QAction* monitorThis = new QAction(QIcon(":/images/icons/preferences-desktop-sound.svg"), "Pré Escuta", this);
+    menu->addAction( monitorThis );
+    menu->popup(view->viewport()->mapToGlobal(pos));
+
+    connect(monitorThis, &QAction::triggered, this, [this, path]() {
+        cuePath(path);
+    });
 }
 
 void MainWindow::unSelectedJingle()

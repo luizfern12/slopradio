@@ -43,7 +43,7 @@ Tracks with video play in a dedicated video window, and the same crossfade used 
 - Fixed: segfaults when editing the playlist mid-playback, double-advance races on short jingles, and a Stop button that didn't stop with an empty playlist.
 
 ### 🎧 Studio workflow
-- **Pre-cue** — right-click any playlist row to open a cue window with its own transport (seek, play/pause/stop) and **headphone volume**, routed to a separate output device.
+- **Pre-cue** — right-click any playlist row *or any file in the left-hand browsers* to open a cue window with its own transport (seek, play/pause/stop) and **headphone volume**, routed to a separate output device.
 - **Output device selection** — pick the main output *and* a dedicated cue/headphones device (**Settings → Saídas**), hot-plug aware.
 - **Playlist improvements** — drag & drop from the file manager (files or whole folders), multi-select with `Ctrl`/`Shift` + `Del` to remove, and playback pointers that survive row removals.
 

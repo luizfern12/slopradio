@@ -77,6 +77,23 @@ Fork: https://github.com/brdelphus/lararadio
   próprios controles da janela ou fechá-la encerram a pré escuta.
   Clicar em outra linha usa a mesma janela.
 
+#### `mainwindow.h` / `mainwindow.cpp`
+- **Pré escuta pelos navegadores de arquivos**: clicar com o botão
+  direito em uma linha de qualquer um dos navegadores da esquerda
+  (`files` — Músicas, `jingle_files` — Jingles) agora oferece
+  **Pré Escuta**, abrindo a mesma janela de pré escuta da playlist.
+  Arquivos de mídia tocam como são; pastas pré escutam uma faixa
+  aleatória de dentro, igual às pastas da playlist. Arquivos que não
+  são mídia (`.xml`, `.png`, `.desktop`, …) não mostram menu, já que
+  o player não conseguiria abri-los. Os dois navegadores compartilham
+  um único handler de menu de contexto.
+- **`cuePreview()` dividido em `cuePath()` / `cuePlay()`**: a criação
+  da janela, o `loadAndPlay()` e o raise/activate foram para
+  `cuePlay(path, displayName)`, compartilhado entre a playlist e os
+  navegadores de arquivos. A escolha aleatória de pasta foi para o
+  helper `randomMediaInFolder()`, e o novo `mediaDisplayName()` dá ao
+  item do navegador o mesmo rótulo `title - artist` usado na playlist.
+
 #### `configdialog.ui` / `configdialog.cpp`
 - **Dispositivo de fones (aba Saídas)**: um segundo combo
   (`Dispositivo de fones (cue)`, salvo em `audio/cueDevice`) roteia as
